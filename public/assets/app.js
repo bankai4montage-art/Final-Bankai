@@ -624,17 +624,24 @@ function viewSystem(_view, sys) {
   if (!sys) return;
   showSystemView(sys.key); // native container hides; the embed stage shows
 
-  const tab = sys.tabs.length && S.params.tab && sys.tabs.some(t => t.id === S.params.tab)
-    ? S.params.tab
-    : sys.tabs[0]?.id;
-  /* only (re)point the URL when the frame must show a different tab.
+  /* Returning to a system resumes it exactly where the user left it —
+     only an EXPLICIT ?tab=… in the URL moves the frame.
      NB: detect first mount BEFORE calling mountFrame (it creates the frame). */
   const mounted = !sysFrameOf(sys.key);
   const frame = mountFrame(sys);
   setActiveFrame(sys); // exactly one visible frame in the persistent host
-  if (mounted || S.sysTab[sys.key] !== tab) frame.src = sysUrl(sys, tab);
-  S.sysTab[sys.key] = tab;
-  renderTabsbar(sys, tab);
+
+  const explicit = sys.tabs.length && S.params.tab && sys.tabs.some(t => t.id === S.params.tab)
+    ? S.params.tab
+    : null;
+  if (mounted) {
+    S.sysTab[sys.key] = explicit || sys.tabs[0]?.id;
+    frame.src = sysUrl(sys, S.sysTab[sys.key]);
+  } else if (explicit && explicit !== S.sysTab[sys.key]) {
+    setSystemTab(sys, explicit); // deep link: jump inside the running system
+  }
+  S.sysTab[sys.key] = S.sysTab[sys.key] || sys.tabs[0]?.id;
+  renderTabsbar(sys, S.sysTab[sys.key]);
 
   $('#tabsbar').onclick = (e) => {
     const b = e.target.closest('.tabs-tab[data-tab]');
