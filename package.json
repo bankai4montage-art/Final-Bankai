@@ -7,10 +7,11 @@
   "main": "server.js",
   "engines": { "node": ">=22" },
   "scripts": {
-    "start": "node server.js",
+    "start": "node scripts/bootstrap-data.js && node server.js",
     "dev": "node --watch server.js",
     "seed:admin": "node scripts/seed-admin.js",
     "copy:databases": "node scripts/copy-databases.js",
+    "bootstrap:data": "node scripts/bootstrap-data.js",
     "test": "node --test tests/",
     "test:api": "node --test tests/api.test.js"
   },
