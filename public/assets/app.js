@@ -626,6 +626,7 @@ function viewSystem(_view, sys) {
      NB: detect first mount BEFORE calling mountFrame (it creates the frame). */
   const mounted = !sysFrameOf(sys.key);
   const frame = mountFrame(sys);
+  setActiveFrame(sys); // exactly one visible frame in the persistent host
   if (mounted || S.sysTab[sys.key] !== tab) frame.src = sysUrl(sys, tab);
   S.sysTab[sys.key] = tab;
   renderTabsbar(sys, tab);
@@ -634,6 +635,17 @@ function viewSystem(_view, sys) {
     const b = e.target.closest('.tabs-tab[data-tab]');
     if (b) setSystemTab(sys, b.dataset.tab);
   };
+}
+
+/* exactly ONE visible iframe inside the persistent host (hidden frames stay alive) */
+function setActiveFrame(sys) {
+  const host = $('#sysHost');
+  if (!host) return;
+  const active = `sysFrame-${sys.key}`;
+  for (const el of [...host.children]) {
+    if (el.tagName === 'IFRAME') el.hidden = el.id !== active;
+    else if (el.classList?.contains('sys-loading')) el.hidden = el.id !== `sysLoading-${sys.key}`;
+  }
 }
 
 /* first visit in this app session (before the system's iframe exists) */
