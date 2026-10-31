@@ -19,6 +19,7 @@ import hiring from './src/adapters/hiring.js';
 import ticketing from './src/adapters/ticketing.js';
 import { links, setting } from './src/db.js';
 import sysProxy from './src/proxy.js';
+import live from './src/live.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -432,6 +433,9 @@ app.get('/api/notifications', requireAuth, (req, res) => {
   });
 });
 
+/* Server-Sent Events — every change inside any member system arrives here live */
+app.get('/api/live', requireAuth, (req, res) => live.subscribe(res, req.user));
+
 app.post('/api/notifications/read', requireAuth, requireCsrf, (req, res) => {
   ok(res, { unread: markRead(req.user.id, req.body?.id || null) });
 });
@@ -543,5 +547,7 @@ const server = app.listen(config.port, () => {
   console.log(`🛰  Final-Bankai on http://localhost:${config.port}  (${config.env})`);
   console.log(`   roster:${roster.available()}  hiring:${hiring.available()}  ticketing:${ticketing.available()}`);
 });
+
+live.start(); // cross-system real-time feed (SSE /api/live)
 
 export { app, server };

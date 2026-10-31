@@ -364,33 +364,121 @@ function closeDrawer() {
 }
 $('#drawerOverlay').addEventListener('click', closeDrawer);
 
-/* ------------------------------ NOTIFICATIONS ------------------------------ */
+/* ------------------------------ NOTIFICATIONS + LIVE HUB ------------------------------ */
+/* The platform listens to its own notifications AND (through the SSE /api/live
+   channel) to every change happening inside the three member systems. */
+const live = {
+  stream: null, connected: false, items: [], seen: new Set(), unreadLive: 0, retry: 0
+};
+
+function liveItem(ev) {
+  return `
+    <div class="notif-item live ${live.seen.has(ev.id) ? '' : 'unread'}">
+      <span class="chip live" style="--c:${ev.colour || 'var(--purple)'}"></span>
+      <div style="min-width:0">
+        <b>${esc(ev.title)}</b>
+        <small>${esc(ev.body || '')} · ${ago(ev.at)}</small>
+      </div>
+    </div>`;
+}
+
+function renderLiveFeed() {
+  $('#notifPanel').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)">
+      <b style="font-size:12px">Live</b>
+      <span class="live-pill ${live.connected ? 'ok' : ''}">${live.connected ? 'connected' : 'connecting'}</span>
+      <div style="flex:1"></div>
+      <button class="btn sm ghost" id="markAllRead">Clear all</button>
+    </div>
+    ${live.items.length ? live.items.slice(0, 24).map(liveItem).join('') : '<div class="empty">Listening to the systems…</div>'}
+    ${S.notifications.length ? `<div class="nav-label" style="padding:10px 14px 4px">Earlier</div>
+      ${S.notifications.map(n => `
+        <div class="notif-item ${n.read_at ? '' : 'unread'}">
+          <span class="chip ${n.module === 'tickets' ? 'info' : n.module === 'hiring' ? 'purple' : 'mute'}" style="height:18px"></span>
+          <div style="min-width:0"><b>${esc(n.title)}</b><small>${esc(n.body || '')} · ${ago(n.created_at)}</small></div>
+        </div>`).join('')}` : ''}`;
+  $('#markAllRead')?.addEventListener('click', () => {
+    live.items = []; live.seen.clear(); live.unreadLive = 0;
+    S.unread = 0; $('#notifDot').hidden = true;
+    renderLiveFeed();
+  });
+}
+
+function pushLive(ev) {
+  const key = ev.id || `${ev.module}|${ev.title}|${ev.at}`;
+  if (live.seen.has(key)) return;
+  live.seen.add(key);
+  if (live.seen.size > 400) live.seen = new Set([...live.seen].slice(-200));
+  live.items.unshift(ev);
+  if (live.items.length > 120) live.items.length = 120;
+
+  /* toast only if the panel is closed (opening the bell shows everything inline) */
+  const panelOpen = $('#notifPanel').classList.contains('open');
+  if (!panelOpen) {
+    live.unreadLive++; S.unread = (S.unread || 0) + 1; $('#notifDot').hidden = false;
+    toastLive(ev);
+  } else {
+    renderLiveFeed();
+  }
+  /* fresh data hint while sitting inside that very system */
+  const sys = systemBy(String(ev.module || '').toLowerCase());
+  if (sys && S.route === `system/${sys.key}` && ev.link) {
+    $('#tabsbar')?.classList.add('pulse');
+    setTimeout(() => $('#tabsbar')?.classList.remove('pulse'), 1600);
+  }
+}
+
+function toastLive(ev) {
+  const el = document.createElement('div');
+  el.className = 'toast live';
+  el.style.setProperty('--c', ev.colour || 'var(--purple)');
+  el.innerHTML = `<span class="dot"></span><span><b>${esc(ev.module)}</b> · ${esc(ev.title)}${ev.body ? `<small>${esc(ev.body)}</small>` : ''}</span>`;
+  el.addEventListener('click', () => { if (ev.link) location.hash = ev.link; });
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(6px)'; setTimeout(() => el.remove(), 250); }, 4600);
+}
+
+function connectLive() {
+  if (!('EventSource' in window) || live.stream) return;
+  const open = () => {
+    live.stream = new EventSource('/api/live');
+    live.stream.onopen = () => { live.connected = true; if ($('#notifPanel').classList.contains('open')) renderLiveFeed(); };
+    live.stream.onmessage = (m) => {
+      try {
+        const d = JSON.parse(m.data);
+        if (d.type === 'hello') {
+          live.connected = true;
+          for (const ev of (d.buffer || []).slice(-12)) pushLive({ ...ev, silent: true });
+        } else if (d.type === 'event') {
+          pushLive(d);
+        }
+      } catch { /* ignore malformed */ }
+    };
+    live.stream.onerror = () => {
+      live.connected = false;
+      live.stream.close(); live.stream = null;
+      live.retry = Math.min(30000, (live.retry || 2000) * 2);
+      setTimeout(() => { if (!live.stream) open(); }, live.retry);
+    };
+  };
+  open();
+}
+$('#notifBtn').addEventListener('click', () => {
+  const opening = !$('#notifPanel').classList.contains('open');
+  $('#notifPanel').classList.toggle('open');
+  if (opening) { live.unreadLive = 0; renderLiveFeed(); }
+});
+
 async function loadNotifications() {
   try {
     const data = await api('/api/notifications?limit=20');
     S.notifications = data.items || [];
-    S.unread = data.unread || 0;
-    $('#notifDot').hidden = !S.unread;
-    $('#notifPanel').innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)">
-        <b style="font-size:12px">Notifications</b><div style="flex:1"></div>
-        <button class="btn sm ghost" id="markAllRead">Mark all read</button>
-      </div>
-      ${S.notifications.length ? S.notifications.map(n => `
-        <div class="notif-item ${n.read_at ? '' : 'unread'}">
-          <span class="chip ${n.module === 'tickets' ? 'turq' : n.module === 'hiring' ? 'purple' : 'mute'}" style="height:18px"></span>
-          <div style="min-width:0">
-            <b>${esc(n.title)}</b>
-            <small>${esc(n.body || '')} · ${ago(n.created_at)}</small>
-          </div>
-        </div>`).join('') : '<div class="empty">No notifications yet</div>'}`;
-    $('#markAllRead')?.addEventListener('click', async () => {
-      const r = await api('/api/notifications/read', { method: 'POST', body: {} });
-      S.unread = r.unread; $('#notifDot').hidden = !S.unread; loadNotifications();
-    });
-  } catch { /* ignore */ }
+    $('#notifDot').hidden = !((S.unread || 0) + live.unreadLive);
+    renderLiveFeed();
+    connectLive();
+  } catch { /* ignore */
+  }
 }
-$('#notifBtn').addEventListener('click', () => $('#notifPanel').classList.toggle('open'));
 
 /* ------------------------------ GLOBAL SEARCH ------------------------------ */
 let searchTimer;

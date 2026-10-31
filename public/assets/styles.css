@@ -91,7 +91,8 @@ body::before {
 @keyframes introOut { 35% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
 /* skip-jump: everything lands in its final state instantly once */
-#intro.fast .in-mark svg    { stroke-dashoffset: 0 !important; opacity: 1 !important; }
+#intro.fast .in-mark .lg-orbit,
+#intro.fast .in-mark .lg-bolt { stroke-dashoffset: 0 !important; opacity: 1 !important; stroke-dasharray: none !important; }
 #intro.fast .in-mark        { opacity: 1 !important; transform: none !important; }
 #intro.fast .in-word span   { opacity: 1 !important; transform: none !important; filter: blur(0) !important; }
 #intro.fast .in-line, #intro.fast .in-sub, #intro.fast .in-chip,
@@ -119,18 +120,42 @@ body::before {
 
 .in-stage { position: relative; z-index: 2; display: grid; place-items: center; text-align: center; gap: 20px; }
 
-/* brand mark: gradient tile, the strokes draw themselves */
+/* brand mark: gradient tile + logo arcs draw themselves in colours */
 .in-mark {
   width: 96px; height: 96px; border-radius: 27px; display: grid; place-items: center;
-  background: linear-gradient(150deg, rgba(124,92,255,.92), rgba(20,217,196,.8));
-  box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 30px 90px -22px rgba(124,92,255,.85);
+  background: linear-gradient(150deg, #131228, #191736 55%, #101020);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 30px 90px -22px rgba(124,92,255,.75);
   opacity: 0; transform: scale(.62) translateY(16px);
-  animation: inPopIn 1s var(--spring) .35s forwards;
+  position: relative;
+  animation: inPopIn 1s var(--spring) .35s forwards, inBreathe 5s ease-in-out 2s infinite;
 }
-.in-mark svg { width: 50px; height: 50px; color: #fff; }
-.in-mark svg path { stroke-dasharray: 96; stroke-dashoffset: 96; animation: inDraw .9s var(--ease) .75s forwards; }
+.in-mark::after {
+  content: ''; position: absolute; inset: -1px; border-radius: 27px; pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.18) 50%, transparent 70%);
+  background-size: 250% 100%; background-position: 120% 0;
+  animation: inSweep 2.6s ease 1.9s 2;
+}
+@keyframes inSweep { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.in-mark svg { width: 62px; height: 62px; overflow: visible; }
+.in-mark .lg-orbit { opacity: 0; }
+.in-mark .lg-o1 { color: #A78BFA; }
+.in-mark .lg-o2 { color: #14D9C4; }
+.in-mark .lg-o3 { color: #60A5FA; }
+.in-mark .lg-bolt { color: #fff; opacity: 0; }
+/* strokes pre-measured with pathLength=100 → one dash animation for all */
+.in-mark .lg-orbit, .in-mark .lg-bolt { stroke-dasharray: 100; stroke-dashoffset: 100; }
+.in-mark .lg-o1 { animation: inDraw .7s var(--ease) .65s forwards, inOrbitSpin 26s linear 2s infinite; }
+.in-mark .lg-o2 { animation: inDraw .7s var(--ease) .95s forwards, inOrbitSpin 26s linear 1.85s infinite; }
+.in-mark .lg-o3 { animation: inDraw .7s var(--ease) 1.25s forwards, inOrbitSpin 26s linear 1.7s infinite; }
+.in-mark .lg-bolt { animation: inDraw .55s var(--ease) 1.55s forwards; }
+.in-mark .lg-orbit { transform-origin: 32px 32px; }
+@keyframes inDraw { 0% { opacity: 1; stroke-dashoffset: 100; } 100% { opacity: 1; stroke-dashoffset: 0; } }
+@keyframes inOrbitSpin { to { transform: rotate(360deg); } }
+@keyframes inBreathe {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 30px 90px -22px rgba(124,92,255,.75); }
+  50% { box-shadow: 0 0 0 1px rgba(255,255,255,.20), 0 34px 110px -20px rgba(124,92,255,.95); }
+}
 @keyframes inPopIn { to { opacity: 1; transform: none; } }
-@keyframes inDraw { to { stroke-dashoffset: 0; } }
 
 /* wordmark: one staggered blur-to-sharp letter at a time */
 .in-word {
@@ -585,3 +610,30 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width
 }
 @keyframes sysSpin { to { transform: rotate(360deg); } }
 @media (max-width: 720px) { .sys-stage { padding: 0 12px 12px; } .sys-host { min-height: 60vh; border-radius: var(--r); } .sys-host iframe { height: calc(100vh - var(--topbar) - 150px); } }
+
+/* ============================== LIVE HUB ============================== */
+/* connection pill inside the panel */
+.live-pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 18px; padding: 0 9px; border-radius: 999px;
+  font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-3); background: rgba(255,255,255,.05); border: 1px solid var(--line);
+}
+.live-pill::before { content: ''; width: 6px; height: 6px; border-radius: 99px; background: var(--text-3); }
+.live-pill.ok { color: var(--turq); border-color: rgba(20,217,196,.4); }
+.live-pill.ok::before { background: var(--turq); box-shadow: 0 0 8px var(--turq); animation: glowPulse 1.6s ease infinite; }
+
+/* live feed row */
+.notif-item.live { cursor: default; }
+.notif-item.live .chip.live { width: 10px; height: 10px; padding: 0; border-radius: 3px; background: var(--c, var(--purple)); box-shadow: 0 0 10px var(--c, var(--purple)); }
+.notif-item.live.unread b { color: var(--text); }
+
+/* live toast: module-coloured edge */
+.toast.live { cursor: pointer; border-inline-start: 2.5px solid var(--c, var(--purple)); }
+.toast.live .dot { width: 9px; height: 9px; border-radius: 99px; background: var(--c, var(--purple)); box-shadow: 0 0 10px var(--c, var(--purple)); flex: none; }
+.toast.live small { display: block; color: var(--text-3); font-size: 10.5px; margin-top: 2px; }
+
+/* system workspace gently pulses when new data for it arrives */
+.tabsbar.pulse { animation: tabsPulse 1.5s var(--ease); }
+@keyframes tabsPulse {
+  30% { border-color: color-mix(in srgb, var(--c, var(--purple)) 60%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c, var(--purple)) 25%, transparent), 0 14px 34px -22px rgba(0,0,0,.9); }
+}
