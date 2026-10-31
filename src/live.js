@@ -114,16 +114,14 @@ class LiveHub {
       const res = await fetch(`${UP.hiring.url}/api/events?limit=15`, {
         headers: { accept: 'application/json' }, signal: AbortSignal.timeout(6000)
       });
-      if (!res.ok) return;
+      if (!res.ok) { if (process.env.PROXY_DEBUG) console.log('[hub] hiring poll', res.status); return; }
       const items = await res.json();
       const list = Array.isArray(items) ? items : items.items || [];
-      const fresh = list.filter((e) => e.type !== 'status' || true).slice(0, 15);
-      // newest stamp most-recent-first? assume API returns newest first
-      let changed = false;
-      for (const e of fresh.reverse()) {
+      if (process.env.PROXY_DEBUG) console.log(`[hub] hiring poll → ${list.length} events (stamp: ${this.hiringStamp || '?'})`);
+      for (const e of [...list].reverse()) {
         const stamp = e.createdAt || e.created_at || '';
         if (!stamp || stamp <= this.hiringStamp) continue;
-        this.hiringStamp = stamp; changed = true;
+        this.hiringStamp = stamp;
         const who = (e.user_name || e.userEmail || '') + '';
         this.emit({
           module: 'Hiring', kind: e.type || 'update',

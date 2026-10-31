@@ -91,8 +91,6 @@ body::before {
 @keyframes introOut { 35% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
 /* skip-jump: everything lands in its final state instantly once */
-#intro.fast .in-mark .lg-orbit,
-#intro.fast .in-mark .lg-bolt { stroke-dashoffset: 0 !important; opacity: 1 !important; stroke-dasharray: none !important; }
 #intro.fast .in-mark        { opacity: 1 !important; transform: none !important; }
 #intro.fast .in-word span   { opacity: 1 !important; transform: none !important; filter: blur(0) !important; }
 #intro.fast .in-line, #intro.fast .in-sub, #intro.fast .in-chip,
@@ -120,40 +118,26 @@ body::before {
 
 .in-stage { position: relative; z-index: 2; display: grid; place-items: center; text-align: center; gap: 20px; }
 
-/* brand mark: gradient tile + logo arcs draw themselves in colours */
+/* brand mark: Rawahel logo tile, drawn-in + breathing glow */
 .in-mark {
-  width: 96px; height: 96px; border-radius: 27px; display: grid; place-items: center;
-  background: linear-gradient(150deg, #131228, #191736 55%, #101020);
-  box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 30px 90px -22px rgba(124,92,255,.75);
+  width: 104px; height: 104px; border-radius: 28px; display: grid; place-items: center;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.10), 0 30px 90px -22px rgba(37,99,235,.66);
   opacity: 0; transform: scale(.62) translateY(16px);
   position: relative;
   animation: inPopIn 1s var(--spring) .35s forwards, inBreathe 5s ease-in-out 2s infinite;
 }
+.in-mark img { width: 96px; height: 96px; display: block; object-fit: contain; filter: drop-shadow(0 18px 44px rgba(37,99,235,.55)); }
 .in-mark::after {
-  content: ''; position: absolute; inset: -1px; border-radius: 27px; pointer-events: none;
+  content: ''; position: absolute; inset: -1px; border-radius: 28px; pointer-events: none; overflow: hidden;
   background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.18) 50%, transparent 70%);
   background-size: 250% 100%; background-position: 120% 0;
   animation: inSweep 2.6s ease 1.9s 2;
 }
 @keyframes inSweep { from { background-position: 120% 0; } to { background-position: -120% 0; } }
-.in-mark svg { width: 62px; height: 62px; overflow: visible; }
-.in-mark .lg-orbit { opacity: 0; }
-.in-mark .lg-o1 { color: #A78BFA; }
-.in-mark .lg-o2 { color: #14D9C4; }
-.in-mark .lg-o3 { color: #60A5FA; }
-.in-mark .lg-bolt { color: #fff; opacity: 0; }
-/* strokes pre-measured with pathLength=100 → one dash animation for all */
-.in-mark .lg-orbit, .in-mark .lg-bolt { stroke-dasharray: 100; stroke-dashoffset: 100; }
-.in-mark .lg-o1 { animation: inDraw .7s var(--ease) .65s forwards, inOrbitSpin 26s linear 2s infinite; }
-.in-mark .lg-o2 { animation: inDraw .7s var(--ease) .95s forwards, inOrbitSpin 26s linear 1.85s infinite; }
-.in-mark .lg-o3 { animation: inDraw .7s var(--ease) 1.25s forwards, inOrbitSpin 26s linear 1.7s infinite; }
-.in-mark .lg-bolt { animation: inDraw .55s var(--ease) 1.55s forwards; }
-.in-mark .lg-orbit { transform-origin: 32px 32px; }
-@keyframes inDraw { 0% { opacity: 1; stroke-dashoffset: 100; } 100% { opacity: 1; stroke-dashoffset: 0; } }
-@keyframes inOrbitSpin { to { transform: rotate(360deg); } }
 @keyframes inBreathe {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 30px 90px -22px rgba(124,92,255,.75); }
-  50% { box-shadow: 0 0 0 1px rgba(255,255,255,.20), 0 34px 110px -20px rgba(124,92,255,.95); }
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,.10), 0 30px 90px -22px rgba(37,99,235,.66); }
+  50% { box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 36px 110px -20px rgba(37,99,235,.9); }
 }
 @keyframes inPopIn { to { opacity: 1; transform: none; } }
 
@@ -244,8 +228,9 @@ body::before {
   animation: rise .7s var(--ease) both;
 }
 .login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
-.login-brand .mark { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: linear-gradient(150deg, var(--purple), var(--turq)); }
+.login-brand .mark { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: #fff; overflow: hidden; }
 .login-brand .mark svg { width: 24px; height: 24px; color: #fff; }
+.login-brand .mark img { width: 100%; height: 100%; display: block; }
 .login-brand h1 { font-size: 19px; margin: 0; letter-spacing: -.02em; }
 .login-brand p { margin: 2px 0 0; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--text-3); }
 .login-card h2 { font-size: 22px; margin: 0 0 6px; letter-spacing: -.02em; }
@@ -293,8 +278,11 @@ body::before {
   transition: transform .35s var(--ease);
 }
 .brand { display: flex; align-items: center; gap: 11px; padding: 4px 8px 16px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
-.brand .mark { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: linear-gradient(150deg, var(--purple), var(--turq)); box-shadow: 0 10px 26px -12px rgba(124,92,255,.9); flex: none; }
+.brand .mark { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px var(--line-strong); flex: none; overflow: hidden; }
 .brand .mark svg { width: 21px; height: 21px; color: #fff; }
+.brand .mark img { width: 130%; height: 130%; display: block; object-fit: contain; }
+.brand .mark img { transition: transform .35s var(--spring); }
+.brand:hover .mark img { transform: scale(1.09) rotate(-2deg); }
 .brand b { display: block; font-size: 14.5px; letter-spacing: -.01em; }
 .brand small { display: block; font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-3); margin-top: 2px; }
 

@@ -66,7 +66,7 @@ const intro = (() => {
   /* build the wordmark once: one span per letter for the stagger effect */
   if (word && !word.dataset.built) {
     word.dataset.built = '1';
-    word.innerHTML = [...'FINAL BANKAI'].map((ch, i) =>
+    word.innerHTML = [...'Rawahel'].map((ch, i) =>
       ch === ' ' ? '<span class="in-gap"> </span>' : `<span style="--i:${i}">${ch}</span>`).join('');
   }
 
@@ -420,12 +420,17 @@ function pushLive(ev) {
   } else {
     renderLiveFeed();
   }
-  /* fresh data hint while sitting inside that very system */
+  /* live data, live: the open system's own refresh hook (same-origin direct call) */
   const sys = systemBy(String(ev.module || '').toLowerCase());
-  if (sys && S.route === `system/${sys.key}` && ev.link) {
-    $('#tabsbar')?.classList.add('pulse');
-    setTimeout(() => $('#tabsbar')?.classList.remove('pulse'), 1600);
-  }
+  try {
+    console.log('[live] push:', ev.module, '→', sys?.key, 'route:', S.route, 'fn:', typeof sysFrameOf(sys?.key || '')?.contentWindow?.bkRefresh);
+    if (sys && S.route === `system/${sys.key}`) {
+      const w = sysFrameOf(sys.key)?.contentWindow;
+      if (typeof w?.bkRefresh === 'function') w.bkRefresh(); else w?.postMessage({ type: 'bk:refresh' }, '*');
+      $('#tabsbar')?.classList.add('pulse');
+      setTimeout(() => $('#tabsbar')?.classList.remove('pulse'), 1600);
+    }
+  } catch (e) { console.error('[live] refresh nudge failed:', e.message); }
 }
 
 function toastLive(ev) {
