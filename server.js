@@ -18,12 +18,21 @@ import roster from './src/adapters/roster.js';
 import hiring from './src/adapters/hiring.js';
 import ticketing from './src/adapters/ticketing.js';
 import { links, setting } from './src/db.js';
+import sysProxy from './src/proxy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.set('trust proxy', 1);
-app.use(express.json({ limit: '1mb' }));
 app.use(attachUser);
+
+/* ---- member systems proxy (streams raw bodies — runs before the JSON parser) ----
+   Auth gate: only signed-in operators may reach the embedded systems. */
+app.use('/sys', (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Sign in first.' });
+  next();
+}, sysProxy);
+
+app.use(express.json({ limit: '1mb' }));
 
 /* ------------------------------ rate limiting ------------------------------ */
 const buckets = new Map();
@@ -188,7 +197,7 @@ app.post('/api/roster/attendance', requireAuth, requireCsrf, requirePermission('
       notifyPermission('roster.view', {
         module: 'roster', kind: 'attendance',
         title: `${status}: employee #${employeeId}`,
-        body: `${date} · fine ${fine}`, link: '#/roster'
+        body: `${date} · fine ${fine}`, link: '#/system/roster'
       });
     }
     ok(res, { ok: true, ...result });
@@ -242,7 +251,7 @@ app.post('/api/hiring/candidates/:id/status', requireAuth, requireCsrf, requireP
     if (status === 'Attended to D0') {
       notifyPermission('hiring.view', {
         module: 'hiring', kind: 'candidate', title: `Candidate reached D0: ${updated.fullName}`,
-        body: updated.branch, link: `#/hiring?candidate=${updated.id}`
+        body: updated.branch, link: '#/system/hiring'
       });
     }
     ok(res, updated);
@@ -285,7 +294,7 @@ app.post('/api/hiring/candidates/:id/convert', requireAuth, requireCsrf, require
     });
     notifyPermission('hiring.view', {
       module: 'hiring', kind: 'hired', title: `Hired: ${candidate.fullName}`,
-      body: `Employee ${employee.code} created in ${employee.branch}`, link: `#/roster?employee=${employee.id}`
+      body: `Employee ${employee.code} created in ${employee.branch}`, link: '#/system/roster'
     });
 
     ok(res, { employee, candidate: hiring.get(candidateId) });
@@ -336,7 +345,7 @@ app.post('/api/tickets', requireAuth, requireCsrf, requirePermission('tickets.ma
     audit(req, { action: 'ticket.created', module: 'tickets', entity: 'ticket', entityId: ticket.id, detail: { category, code } });
     notifyPermission('tickets.view', {
       module: 'tickets', kind: 'ticket', title: `New ticket #${ticket.id}`,
-      body: `${ticket.courierName || ticket.code} · ${ticket.category}`, link: `#/tickets?ticket=${ticket.id}`
+      body: `${ticket.courierName || ticket.code} · ${ticket.category}`, link: '#/system/tickets'
     });
     ok(res, ticket);
   } catch (err) {
@@ -355,7 +364,7 @@ app.patch('/api/tickets/:id', requireAuth, requireCsrf, requirePermission('ticke
     if (before && before.status !== ticket.status) {
       notifyPermission('tickets.view', {
         module: 'tickets', kind: 'ticket', title: `Ticket #${ticket.id} → ${ticket.status}`,
-        body: ticket.courierName || ticket.code, link: `#/tickets?ticket=${ticket.id}`
+        body: ticket.courierName || ticket.code, link: '#/system/tickets'
       });
     }
     ok(res, ticket);
@@ -396,21 +405,21 @@ app.get('/api/search', requireAuth, (req, res) => {
     const items = hiring.search(q, 6);
     if (items.length) groups.push({
       module: 'hiring', label: 'Candidates',
-      items: items.map(c => ({ ...c, link: `#/hiring?candidate=${c.id}` }))
+      items: items.map(c => ({ ...c, link: '#/system/hiring' }))
     });
   }
   if (req.perms.has('tickets.view') && ticketing.available()) {
     const items = ticketing.search(q, 6);
     if (items.length) groups.push({
       module: 'tickets', label: 'Tickets',
-      items: items.map(t => ({ ...t, link: `#/tickets?ticket=${t.id}` }))
+      items: items.map(t => ({ ...t, link: '#/system/tickets' }))
     });
   }
   if (req.perms.has('roster.view') && roster.available()) {
     const branches = roster.branches().filter(b => String(b.branch).toLowerCase().includes(q.toLowerCase()));
     if (branches.length) groups.push({
       module: 'roster', label: 'Branches',
-      items: branches.map(b => ({ id: b.branch, title: b.branch, subtitle: `${b.n} active`, link: `#/roster?branch=${encodeURIComponent(b.branch)}` }))
+      items: branches.map(b => ({ id: b.branch, title: b.branch, subtitle: `${b.n} active`, link: '#/system/roster' }))
     });
   }
   ok(res, { query: q, results: groups });
@@ -506,7 +515,14 @@ app.put('/api/settings', requireAuth, requireCsrf, (req, res) => {
 
 /* ================================ STATIC SPA ================================ */
 
-app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
+app.use(express.static(path.join(__dirname, 'public'), {
+  extensions: ['html'],
+  etag: true,
+  lastModified: true,
+  cacheControl: true,
+  maxAge: 0,
+  setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate')
+}));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

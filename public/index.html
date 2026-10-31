@@ -37,16 +37,24 @@
 
 <!-- ============================== CINEMATIC INTRO ============================== -->
 <div id="intro" aria-hidden="true">
-  <canvas id="introCanvas"></canvas>
-  <div class="intro-inner">
-    <div class="intro-mark">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M6.5 6h4l2.5 4.5M9 17.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Zm11 0a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Zm-2.5-2.5H14a5 5 0 0 1-5-5M13 6h2l3 6.5"/></svg>
+  <div class="in-bg"><i></i><i></i><i></i></div>
+  <div class="in-grid"></div>
+  <div class="in-stage">
+    <div class="in-mark" id="inMark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path data-stroke stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M6.5 6h4l2.5 4.5M9 17.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Zm11 0a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Zm-2.5-2.5H14a5 5 0 0 1-5-5M13 6h2l3 6.5"/></svg>
     </div>
-    <div class="intro-title">FINAL BANKAI</div>
-    <div class="intro-line"></div>
-    <div class="intro-sub">One Platform · Three Systems · One Identity</div>
+    <h1 class="in-word" id="inWord" aria-label="FINAL BANKAI"></h1>
+    <div class="in-line"></div>
+    <p class="in-sub">Command Center</p>
+    <div class="in-chips">
+      <span class="in-chip c1"><svg width="11" height="11" aria-hidden="true"><use href="#i-users"/></svg>Roster</span>
+      <span class="in-chip c2"><svg width="11" height="11" aria-hidden="true"><use href="#i-hire"/></svg>Hiring</span>
+      <span class="in-chip c3"><svg width="11" height="11" aria-hidden="true"><use href="#i-ticket"/></svg>Ticketing</span>
+    </div>
   </div>
-  <button class="intro-skip" id="introSkip" type="button">Skip intro</button>
+  <div class="in-progress"><i id="inBar"></i></div>
+  <button class="in-skip" id="introSkip" type="button">Skip <svg width="11" height="11" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+  <p class="in-hint">Press any key to continue</p>
 </div>
 
 <!-- ============================== LOGIN ============================== -->
@@ -112,7 +120,10 @@
     </header>
 
     <div class="notif-panel" id="notifPanel"></div>
+    <nav class="tabsbar" id="tabsbar" hidden aria-label="System sections"></nav>
     <div class="content" id="view"></div>
+    <!-- persistent embedded-system stage: iframes survive navigating away -->
+    <div class="sys-stage" id="sysStage" hidden><div class="sys-host" id="sysHost" hidden></div></div>
   </div>
 </div>
 

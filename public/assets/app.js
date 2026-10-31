@@ -26,7 +26,7 @@ const initials = (name) => (String(name || '?').trim().split(/\s+/).slice(0, 2).
 const icon = (id, cls = '') => `<svg class="${cls}" width="16" height="16" aria-hidden="true"><use href="#i-${id}"/></svg>`;
 
 const S = {
-  user: null, csrf: '', perms: new Set(), route: 'overview',
+  user: null, csrf: '', perms: new Set(), route: 'system/hiring',
   notifications: [], unread: 0, params: {},
   cache: { rosterMeta: null }
 };
@@ -54,79 +54,59 @@ function toast(message, kind = 'ok') {
 }
 
 /* ------------------------------ INTRO ------------------------------ */
-const intro = {
-  el: $('#intro'), canvas: $('#introCanvas'), raf: 0,
-  seenKey: 'fb.intro.seen',
-  hasSeen() { try { return localStorage.getItem(this.seenKey) === '1'; } catch { return false; } },
-  markSeen() { try { localStorage.setItem(this.seenKey, '1'); } catch { /* private mode */ } },
+/* Professional cinematic opening. Plays on every visit (skippable):
+   mark draws itself → wordmark letters sharpen → hairline sweep →
+   the three systems fan out → progress completes → graceful zoom-out. */
+const intro = (() => {
+  const el = $('#intro');
+  const word = $('#inWord');
+  const BAR_MS = matchMedia('(prefers-reduced-motion: reduce)').matches ? 400 : 4300;
+  let finishTimer = 0, finished = false;
 
-  play({ force = false, done = () => {} } = {}) {
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!force && (this.hasSeen() || reduced)) { this.markSeen(); done(); return; }
-    this.el.classList.remove('done');
-    this.el.style.display = 'grid';
-    this.startParticles(reduced);
-    const finish = () => {
-      this.stopParticles();
-      this.markSeen();
-      this.el.classList.add('done');
-      setTimeout(() => { this.el.style.display = 'none'; done(); }, 650);
-    };
-    this.finish = finish;
-    clearTimeout(this.timer);
-    this.timer = setTimeout(finish, reduced ? 350 : 4200);
-  },
-
-  skip() { if (this.finish) this.finish(); },
-
-  startParticles(reduced) {
-    const c = this.canvas;
-    if (!c || reduced) return;
-    const ctx = c.getContext('2d');
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const resize = () => { c.width = innerWidth * dpr; c.height = innerHeight * dpr; };
-    resize();
-    const parts = Array.from({ length: 70 }, () => ({
-      x: Math.random(), y: Math.random(),
-      r: Math.random() * 1.8 + .4,
-      vx: (Math.random() - .5) * .0006,
-      vy: (Math.random() - .5) * .0006,
-      hue: Math.random() > .5 ? '124,92,255' : '20,217,196'
-    }));
-    let t = 0;
-    const step = () => {
-      t += 1;
-      ctx.clearRect(0, 0, c.width, c.height);
-      // soft core light
-      const g = ctx.createRadialGradient(c.width / 2, c.height / 2, 0, c.width / 2, c.height / 2, c.width * .45);
-      g.addColorStop(0, `rgba(124,92,255,${.10 + Math.sin(t / 90) * .03})`);
-      g.addColorStop(.5, 'rgba(20,217,196,.04)');
-      g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, c.width, c.height);
-
-      for (const p of parts) {
-        p.x = (p.x + p.vx + 1) % 1;
-        p.y = (p.y + p.vy + 1) % 1;
-        ctx.beginPath();
-        ctx.arc(p.x * c.width, p.y * c.height, p.r * dpr, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${p.hue},${.25 + Math.sin(t / 40 + p.x * 6) * .25})`;
-        ctx.fill();
-      }
-      this.raf = requestAnimationFrame(step);
-    };
-    step();
-    this.onResize = () => { resize(); };
-    addEventListener('resize', this.onResize);
-  },
-
-  stopParticles() {
-    cancelAnimationFrame(this.raf);
-    removeEventListener('resize', this.onResize);
+  /* build the wordmark once: one span per letter for the stagger effect */
+  if (word && !word.dataset.built) {
+    word.dataset.built = '1';
+    word.innerHTML = [...'FINAL BANKAI'].map((ch, i) =>
+      ch === ' ' ? '<span class="in-gap"> </span>' : `<span style="--i:${i}">${ch}</span>`).join('');
   }
-};
 
-$('#introSkip').addEventListener('click', () => intro.skip());
+  function reset() {
+    finished = false;
+    clearTimeout(finishTimer);
+    el.classList.remove('out', 'fast');
+  }
+
+  function finish() {
+    if (finished) return;
+    finished = true;
+    clearTimeout(finishTimer);
+    el.classList.add('out');
+    // done() fires once the zoom-out fully clears the screen
+    setTimeout(() => { el.classList.remove('out'); el.style.display = 'none'; el._done?.(); el._done = null; }, 750);
+  }
+
+  function play({ force = false, done = () => {} } = {}) {
+    el._done = done;
+    if (force) reset();                      // Settings → Replay
+    finished = false;
+    clearTimeout(finishTimer);
+    el.classList.remove('out');
+    el.style.display = 'grid';
+    // force a reflow so the entrance animations restart from frame 0
+    void el.offsetWidth;
+    finishTimer = setTimeout(finish, BAR_MS);
+  }
+
+  function skip() {
+    if (el._done) { el.classList.add('fast'); finish(); }
+  }
+
+  $('#introSkip').addEventListener('click', skip);
+  el.addEventListener('click', skip);
+  document.addEventListener('keydown', (e) => { if (el.style.display !== 'none' && !finished) { if (['Escape', 'Enter', ' '].includes(e.key)) skip(); } });
+
+  return { play, skip };
+})();
 
 /* ------------------------------ AUTH ------------------------------ */
 function showLogin() {
@@ -168,7 +148,7 @@ $('#loginForm').addEventListener('submit', async (e) => {
     if (!res.ok) throw new Error(data.error || 'Sign-in failed.');
     setSession(data.user, data.csrf);
     showApp();
-    navigate(location.hash || '#/overview', { replace: true });
+    navigate(location.hash || '#/system/hiring', { replace: true });
     toast(`Welcome back, ${data.user.name.split(' ')[0]}`);
   } catch (ex) {
     err.textContent = ex.message;
@@ -185,47 +165,102 @@ $('#logoutBtn').addEventListener('click', async () => {
 });
 
 /* ------------------------------ NAV ------------------------------ */
-const ROUTES = [
-  { id: 'overview', label: 'Overview', icon: 'grid', perm: 'dashboard.view' },
-  { id: 'roster', label: 'Roster & Attendance', icon: 'users', perm: 'roster.view' },
-  { id: 'hiring', label: 'Hiring', icon: 'hire', perm: 'hiring.view' },
-  { id: 'tickets', label: 'DAS Ticketing', icon: 'ticket', perm: 'tickets.view' },
-  { id: 'reports', label: 'Reports', icon: 'chart', perm: 'reports.view' },
-  { id: 'team', label: 'Team', icon: 'team', perm: 'team.manage' },
+/* The three member systems open COMPLETE inside the platform (proxy + iframe).
+   Management pages stay native. No "summary" views — systems run for real. */
+const SYSTEMS = [
+  {
+    key: 'roster', label: 'Roster & Attendance', icon: 'users', colour: 'var(--turq)', perm: 'roster.view',
+    desc: 'Employees, shifts and daily attendance',
+    tabs: [
+      { id: 'dashboard',  label: 'Overview' },
+      { id: 'attendance', label: 'Attendance' },
+      { id: 'schedule',   label: 'Schedule' },
+      { id: 'employees',  label: 'Employees' },
+      { id: 'reports',    label: 'Reports' },
+      { id: 'fines',      label: 'Fines' }
+    ]
+  },
+  {
+    key: 'hiring', label: 'Hiring', icon: 'hire', colour: 'var(--purple)', perm: 'hiring.view',
+    desc: 'Candidates, documents and conversion',
+    tabs: [] // single-list layout since the kanban was retired
+  },
+  {
+    key: 'tickets', label: 'DAS Ticketing', icon: 'ticket', colour: 'var(--info)', perm: 'tickets.view',
+    desc: 'Support tickets and requests',
+    tabs: [
+      { id: 'index', label: 'Portal' },
+      { id: 'admin', label: 'Admin' }
+    ]
+  }
+];
+
+const PAGES = [
+  { id: 'reports',  label: 'Reports',  icon: 'chart',    perm: 'reports.view' },
+  { id: 'team',     label: 'Team',     icon: 'team',     perm: 'team.manage' },
   { id: 'settings', label: 'Settings', icon: 'settings', perm: null }
 ];
 
+const systemBy = (key) => SYSTEMS.find(s => s.key === key);
+const routeAllowed = (r) => !r.perm || S.perms.has(r.perm);
+
 function renderNav() {
-  const visible = ROUTES.filter(r => !r.perm || S.perms.has(r.perm));
-  $('#nav').innerHTML = visible.map(r => `
-    <a class="nav-item ${S.route === r.id ? 'on' : ''}" href="#/${r.id}" data-route="${r.id}">
-      ${icon(r.icon)}<span>${r.label}</span>
-    </a>`).join('');
+  const sys = SYSTEMS.filter(routeAllowed);
+  const pages = PAGES.filter(routeAllowed);
+  $('#nav').innerHTML = `
+    <div class="nav-group-label">Systems</div>
+    ${sys.map(r => `
+      <a class="nav-item system ${S.route === 'system/' + r.key ? 'on' : ''}" href="#/system/${r.key}"
+         data-route="system/${r.key}" data-key="${r.key}" style="--c:${r.colour}">
+        <span class="nav-tile">${icon(r.icon)}</span>
+        <span class="nav-text">
+          <b>${r.label}</b>
+          <small>${r.desc}</small>
+        </span>
+        ${icon('arrow', 'nav-chev')}
+      </a>`).join('')}
+    <div class="nav-group-label">Manage</div>
+    ${pages.map(r => `
+      <a class="nav-item ${S.route === r.id ? 'on' : ''}" href="#/${r.id}" data-route="${r.id}">
+        ${icon(r.icon)}<span>${r.label}</span>
+      </a>`).join('')}`;
 }
 
 /* ------------------------------ ROUTER ------------------------------ */
 const TITLES = {
-  overview: ['Overview', 'Unified operations across all three systems'],
-  roster: ['Roster & Attendance', 'Employees, shifts and daily attendance'],
-  hiring: ['Hiring', 'Candidate pipeline and conversion'],
-  tickets: ['DAS Ticketing', 'Support tickets and requests'],
-  reports: ['Reports', 'Cross-system analytics'],
-  team: ['Team', 'Users, roles and permissions'],
+  'system/roster':  ['Roster & Attendance', 'Employees, shifts and daily attendance'],
+  'system/hiring':  ['Hiring', 'Candidate pipeline and conversion'],
+  'system/tickets': ['DAS Ticketing', 'Support tickets and requests'],
+  reports:  ['Reports', 'Cross-system analytics'],
+  team:     ['Team', 'Users, roles and permissions'],
   settings: ['Settings', 'Profile, appearance and system']
 };
 
+/* legacy deep links (notifications / bookmarks) → their system view */
+const LEGACY = { roster: 'system/roster', hiring: 'system/hiring', tickets: 'system/tickets' };
+
 function navigate(hash, { replace = false } = {}) {
-  const [routePart, query] = String(hash || '#/overview').replace(/^#\/?/, '').split('?');
-  const route = ROUTES.find(r => r.id === routePart && (!r.perm || S.perms.has(r.perm)))?.id || 'overview';
+  const [routePart, query] = String(hash || '#/system/hiring').replace(/^#\/?/, '').split('?');
+  let route = routePart;
+  if (LEGACY[route]) { route = LEGACY[route]; hash = `#/${route}${query ? '?' + query : ''}`; }
+  const permitted = route.startsWith('system/')
+    ? routeAllowed(systemBy(route.slice(7)) || {})
+    : routeAllowed(PAGES.find(p => p.id === route) || {});
+  if (!permitted) route = firstSystemRoute();
   S.params = Object.fromEntries(new URLSearchParams(query || ''));
   if (replace) history.replaceState(null, '', `#/${route}${query ? '?' + query : ''}`);
   S.route = route;
-  const [title, sub] = TITLES[route] || TITLES.overview;
+  const [title, sub] = TITLES[route] || ['', ''];
   $('#pageTitle').textContent = title;
   $('#pageSub').textContent = sub;
   renderNav();
   closeDrawer();
   renderRoute();
+}
+
+function firstSystemRoute() {
+  const first = SYSTEMS.find(routeAllowed);
+  return first ? `system/${first.key}` : 'settings';
 }
 
 addEventListener('hashchange', () => navigate(location.hash));
@@ -241,12 +276,18 @@ $('#nav').addEventListener('click', (e) => {
 
 function renderRoute() {
   const view = $('#view');
+  S.sysTab = S.sysTab || {};
+
+  /* system workspaces persist their iframe across visits (no reload flash) */
+  if (S.route.startsWith('system/')) {
+    const sys = systemBy(S.route.slice(7));
+    return viewSystem(view, sys);
+  }
+  hideSystemView();
+
   view.innerHTML = `<div class="card"><div class="card-body"><div class="skeleton" style="height:90px"></div></div></div>`;
-  const fn = {
-    overview: viewOverview, roster: viewRoster, hiring: viewHiring,
-    tickets: viewTickets, reports: viewReports, team: viewTeam, settings: viewSettings
-  }[S.route];
-  (fn || viewOverview)(view).catch(err => {
+  const fn = { reports: viewReports, team: viewTeam, settings: viewSettings }[S.route];
+  (fn || viewSettings)(view).catch(err => {
     console.error(err);
     view.innerHTML = `<div class="card"><div class="card-body"><div class="empty"><b>Could not load this view</b>${esc(err.message)}</div></div></div>`;
   });
@@ -379,512 +420,151 @@ $('#globalSearch').addEventListener('input', (e) => {
   }, 320);
 });
 
-/* ------------------------------ OVERVIEW ------------------------------ */
-async function viewOverview(root) {
-  const d = await api('/api/dashboard');
-  const w = d.workforce || {}, h = d.hiring || {}, t = d.tickets || {};
+/* ------------------------------ SYSTEM WORKSPACES ------------------------------ */
+/* Each member system runs COMPLETE inside the platform shell (own UI, own data)
+   through /sys/<key> — the platform's transparent proxy. A floating tab bar
+   mirrors each system's internal sections in both directions (click a tab →
+   the system switches; switch inside the system → the tab bar follows). */
 
-  const trend = d.trend || [];
-  const maxTrend = Math.max(1, ...trend.map(x => x.present + x.late + x.absent));
-
-  root.innerHTML = `
-    <div class="section-title"><h2>Workforce</h2><div class="line"></div><span class="chip turq">${d.date}</span></div>
-    <div class="stats">
-      ${statCard({ label: 'Employees', value: w.total, icon: 'users', colour: 'var(--turq)', foot: `<span class="pill">${w.branches || 0}</span> branches` })}
-      ${statCard({ label: 'Present today', value: w.present, icon: 'check', colour: 'var(--ok)', foot: `${w.late || 0} late · ${w.absent || 0} absent` })}
-      ${statCard({ label: 'Unmarked', value: w.unmarked, icon: 'clock', colour: 'var(--warn)', foot: `${w.marked || 0} / ${w.expected || 0} marked` })}
-      ${statCard({ label: 'Fines today', value: w.fines || 0, icon: 'alert', colour: 'var(--bad)', foot: 'EGP' })}
-    </div>
-
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-head"><h2>Attendance · last 7 days</h2><div class="spacer" style="flex:1"></div>
-          <span class="chip ok">Present</span><span class="chip warn">Late</span><span class="chip bad">Absent</span></div>
-        <div class="card-body">
-          <svg class="chart" viewBox="0 0 700 190" preserveAspectRatio="none" role="img" aria-label="Attendance trend">
-            ${trend.map((x, i) => {
-              const total = x.present + x.late + x.absent;
-              const hgt = (v) => Math.round((v / maxTrend) * 140);
-              const bx = 24 + i * 94;
-              const p = hgt(x.present), l = hgt(x.late), a = hgt(x.absent);
-              return `<g>
-                <rect class="bar" x="${bx}" y="${150 - p}" width="22" height="${p}" rx="4" fill="#14D9C4" opacity=".85"/>
-                <rect class="bar" x="${bx + 24}" y="${150 - l}" width="22" height="${l}" rx="4" fill="#F59E0B" opacity=".85"/>
-                <rect class="bar" x="${bx + 48}" y="${150 - a}" width="22" height="${a}" rx="4" fill="#EF4444" opacity=".8"/>
-                <text x="${bx + 35}" y="172" text-anchor="middle" fill="#6E6D85" font-size="10">${x.label}</text>
-                <text x="${bx + 35}" y="${140 - Math.max(p, l, a)}" text-anchor="middle" fill="#A7A6BC" font-size="9">${total}</text>
-              </g>`;
-            }).join('')}
-          </svg>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head"><h2>Hiring pipeline</h2></div>
-        <div class="card-body">
-          ${Object.entries(h.byStatus || {}).map(([k, v]) => `
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">
-              <span style="width:104px;font-size:11.5px;color:var(--text-2)">${esc(k)}</span>
-              <div style="flex:1;height:7px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden">
-                <i style="display:block;height:100%;width:${Math.round((v / Math.max(1, h.total)) * 100)}%;background:linear-gradient(90deg,var(--purple),var(--turq))"></i>
-              </div>
-              <b style="font-size:12px;width:24px;text-align:end">${v}</b>
-            </div>`).join('') || '<div class="empty">No candidates yet</div>'}
-          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-            <span class="chip purple">${h.total || 0} total</span>
-            <span class="chip turq">${h.newThisWeek || 0} new this week</span>
-            <span class="chip ok">${h.hired || 0} hired</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="grid-3">
-      ${statCard({ label: 'Candidates', value: h.total, icon: 'hire', colour: 'var(--purple)', foot: `${h.newThisWeek || 0} new this week` })}
-      ${statCard({ label: 'Open tickets', value: t.open + (t.progress || 0) + (t.action || 0), icon: 'ticket', colour: 'var(--turq)', foot: `${t.resolved || 0} resolved` })}
-      ${statCard({ label: 'Overdue', value: t.overdue || 0, icon: 'alert', colour: 'var(--bad)', foot: 'older than 3 days' })}
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Recent activity</h2><div style="flex:1"></div>
-        <button class="btn sm ghost" id="refreshFeed">${icon('refresh')} Refresh</button></div>
-      <div class="card-body feed">
-        ${(d.activity || []).map(a => `
-          <div class="feed-item">
-            <span class="dot" style="background:${a.kind === 'ticket' ? 'var(--turq)' : a.kind === 'candidate' ? 'var(--purple)' : 'var(--text-3)'}"></span>
-            <span class="t">${a.kind === 'audit'
-              ? `<b>${esc(a.user_email || 'system')}</b> · ${esc(a.action)} ${a.entity ? `<span style="color:var(--text-3)">${esc(a.entity)}</span>` : ''}`
-              : a.kind === 'candidate'
-                ? `New candidate <b>${esc(a.title)}</b> <span style="color:var(--text-3)">${esc(a.subtitle || '')}</span>`
-                : `Ticket <b>${esc(a.title)}</b> <span style="color:var(--text-3)">${esc(a.subtitle || '')}</span>`}</span>
-            <time>${ago(a.createdAt || a.created_at)}</time>
-          </div>`).join('') || '<div class="empty">No activity yet</div>'}
-      </div>
-    </div>`;
-
-  $('#refreshFeed')?.addEventListener('click', renderRoute);
+/** URL for a system tab (roster pages live behind hashes, hiring honours
+ *  ?layout=, the ticketing portal and admin are separate pages). */
+function sysUrl(sys, tab) {
+  const base = `/sys/${sys.key}/`;
+  if (sys.key === 'roster')   return base + (tab && tab !== 'dashboard' ? `#${tab}` : '');
+  if (sys.key === 'hiring')   return base + (tab === 'kanban' ? '?layout=kanban' : '');
+  if (sys.key === 'tickets')  return base + (tab === 'admin' ? 'admin.html' : '');
+  return base;
 }
 
-/* ------------------------------ ROSTER ------------------------------ */
-const rosterState = { q: '', branch: '', shift: '', page: 1, date: new Date().toISOString().slice(0, 10) };
+const sysFrameOf = (key) => document.getElementById(`sysFrame-${key}`);
 
-async function viewRoster(root) {
-  const [meta, data, att] = await Promise.all([
-    S.cache.rosterMeta ? Promise.resolve(S.cache.rosterMeta) : api('/api/roster/meta'),
-    api(`/api/roster/employees?q=${encodeURIComponent(rosterState.q)}&branch=${encodeURIComponent(rosterState.branch)}&shift=${encodeURIComponent(rosterState.shift)}&page=${rosterState.page}&pageSize=12`),
-    api(`/api/roster/attendance?date=${rosterState.date}`)
-  ]);
-  S.cache.rosterMeta = meta;
-  const marked = new Map((att.marked || []).map(m => [String(m.employeeId), m]));
-  const m = att.metrics || {};
-
-  root.innerHTML = `
-    <div class="stats">
-      ${statCard({ label: 'Employees', value: m.total, icon: 'users', colour: 'var(--turq)', foot: `${m.branches || 0} branches` })}
-      ${statCard({ label: 'Present', value: m.present, icon: 'check', colour: 'var(--ok)', foot: `${m.marked || 0} marked` })}
-      ${statCard({ label: 'Late', value: m.late, icon: 'clock', colour: 'var(--warn)', foot: `${m.absent || 0} absent` })}
-      ${statCard({ label: 'Unmarked', value: m.unmarked, icon: 'alert', colour: 'var(--purple)', foot: `${m.expected || 0} expected` })}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <h2>Employees</h2>
-        <div style="flex:1"></div>
-        <div class="toolbar">
-          <input class="input-sm" id="rSearch" placeholder="Search name / code / phone" value="${attr(rosterState.q)}" />
-          <select class="select" id="rBranch">
-            <option value="">All branches</option>
-            ${(meta.branches || []).map(b => `<option value="${attr(b.branch)}" ${rosterState.branch === b.branch ? 'selected' : ''}>${esc(b.branch)} (${b.n})</option>`).join('')}
-          </select>
-          <select class="select" id="rShift">
-            <option value="">All shifts</option>
-            ${(meta.shifts || []).map(s => `<option ${rosterState.shift === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="table-wrap">
-          <table class="tbl"><thead><tr>
-            <th>Employee</th><th>Code</th><th>Branch</th><th>Shift</th><th>Type</th><th>Day off</th><th>Today</th>
-          </tr></thead><tbody>
-            ${(data.items || []).map(e => {
-              const st = marked.get(String(e.id));
-              return `<tr data-emp="${e.id}" style="cursor:pointer">
-                <td><div style="display:flex;align-items:center;gap:9px">
-                  <span class="avatar" style="width:28px;height:28px;font-size:11px;background:linear-gradient(135deg,#7C5CFF,#14D9C4)">${initials(e.name)}</span>
-                  <span class="strong">${esc(e.name)}</span></div></td>
-                <td class="num">${esc(e.code || '—')}</td>
-                <td>${esc(e.branch || '—')}</td>
-                <td class="num">${esc(e.shift || '—')}</td>
-                <td>${e.employmentType || '—'}</td>
-                <td>${esc(e.dayOff || '—')}</td>
-                <td>${st ? statusChip(st.status) : '<span class="chip mute">unmarked</span>'}</td>
-              </tr>`;
-            }).join('') || '<tr><td colspan="7"><div class="empty"><b>No employees</b>Try another filter.</div></td></tr>'}
-          </tbody></table>
-        </div>
-        ${pager(data)}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Attendance · ${att.date}</h2><div style="flex:1"></div>
-        <input type="date" class="input-sm" id="attDate" value="${att.date}" /></div>
-      <div class="card-body">
-        <div class="table-wrap">
-          <table class="tbl"><thead><tr><th>Employee</th><th>Shift</th><th>Status</th><th>Fine</th><th>Mark</th></tr></thead><tbody>
-            ${(att.marked || []).map(a => `<tr>
-              <td class="strong">${esc(a.employeeName)}</td><td class="num">${esc(a.shift || '—')}</td>
-              <td>${statusChip(a.status)}</td>
-              <td class="num">${a.fine ? a.fine + ' EGP' : '—'}</td>
-              <td>${attButtons(a.employeeId)}</td>
-            </tr>`).join('')}
-            ${(att.unmarked || []).map(e => `<tr>
-              <td class="strong">${esc(e.name)}</td><td class="num">${esc(e.shift || '—')}</td>
-              <td><span class="chip mute">unmarked</span></td><td>—</td>
-              <td>${attButtons(e.id)}</td>
-            </tr>`).join('')}
-            ${(att.marked || []).length + (att.unmarked || []).length ? '' : '<tr><td colspan="5"><div class="empty">Nobody expected today</div></td></tr>'}
-          </tbody></table>
-        </div>
-      </div>
-    </div>`;
-
-  $('#rSearch')?.addEventListener('input', debounce(() => {
-    rosterState.q = $('#rSearch').value; rosterState.page = 1; viewRoster(root);
-  }, 280));
-  $('#rBranch')?.addEventListener('change', (e) => { rosterState.branch = e.target.value; rosterState.page = 1; viewRoster(root); });
-  $('#rShift')?.addEventListener('change', (e) => { rosterState.shift = e.target.value; rosterState.page = 1; viewRoster(root); });
-  $('#attDate')?.addEventListener('change', (e) => { rosterState.date = e.target.value; viewRoster(root); });
-  wirePager(root, data, (p) => { rosterState.page = p; viewRoster(root); });
-
-  $$('[data-emp]', root).forEach(tr => tr.addEventListener('click', () => openEmployee(tr.dataset.emp)));
-  $$('[data-mark]', root).forEach(b => b.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    const { emp, mark } = b.dataset;
-    const status = mark;
-    try {
-      await api('/api/roster/attendance', { method: 'POST', body: { employeeId: Number(emp), date: rosterState.date, status, fine: status === 'Late' ? 25 : status === 'Absent' ? 50 : 0 } });
-      toast(`${status} saved`);
-      viewRoster(root);
-    } catch { /* toast shown */ }
-  }));
+function showSystemView(sysKey) {
+  $('#view').hidden = true; // native page container
+  $('#sysStage').hidden = false;
+  $('#sysHost').hidden = false;
+  $('#sysHost').className = `sys-host c-${sysKey || ''}`;
+  renderTabsbar(systemBy(sysKey), S.sysTab?.[sysKey]);
 }
 
-function attButtons(employeeId) {
-  return `<div style="display:flex;gap:4px;flex-wrap:wrap">
-    ${['Present', 'Late', 'Absent', 'Excused'].map(s => `<button class="btn sm" data-mark="${s}" data-emp="${employeeId}" style="padding:4px 8px;font-size:10.5px">${s[0]}</button>`).join('')}
-  </div>`;
+function hideSystemView() {
+  $('#sysStage').hidden = true;
+  $('#view').hidden = false;
+  $('#tabsbar').hidden = true;
+  $('#tabsbar').innerHTML = '';
 }
 
-async function openEmployee(id) {
-  const data = await api(`/api/roster/employees/${id}`);
-  const e = data.employee;
-  openDrawer(e.name, `
-    <div style="display:flex;gap:14px;align-items:center">
-      <span class="avatar" style="width:52px;height:52px;font-size:18px;background:linear-gradient(135deg,#7C5CFF,#14D9C4)">${initials(e.name)}</span>
-      <div><b style="font-size:15px">${esc(e.name)}</b><div style="color:var(--text-3);font-size:12px">${esc(e.code || '')} · ${esc(e.branch || '')}</div></div>
-    </div>
-    <dl class="kv">
-      <dt>Employee code</dt><dd>${esc(e.code || '—')}</dd>
-      <dt>Branch</dt><dd>${esc(e.branch || '—')}</dd>
-      <dt>Shift</dt><dd>${esc(e.shift || '—')}</dd>
-      <dt>Type</dt><dd>${e.employmentType === 'PT' ? 'Part Time' : 'Full Time'}</dd>
-      <dt>Day off</dt><dd>${esc(e.dayOff || '—')}</dd>
-      <dt>Phone</dt><dd>${esc(e.phone || '—')}</dd>
-      <dt>Status</dt><dd>${e.active ? '<span class="chip ok">Active</span>' : '<span class="chip mute">Inactive</span>'}</dd>
-    </dl>`);
+/** Build (once) and (re)mount the iframe that runs the system. */
+function mountFrame(sys) {
+  const host = $('#sysHost');
+  let frame = sysFrameOf(sys.key);
+  if (!frame) {
+    frame = document.createElement('iframe');
+    frame.id = `sysFrame-${sys.key}`;
+    frame.title = sys.label;
+    frame.allow = 'camera; clipboard-write; fullscreen';
+    frame.setAttribute('referrerpolicy', 'same-origin');
+    const loader = document.createElement('div');
+    loader.className = 'sys-loading';
+    loader.id = `sysLoading-${sys.key}`;
+    loader.innerHTML = `<div class="sys-load-ring"></div><span>Connecting to ${esc(sys.label)}…</span>`;
+    host.appendChild(loader);
+    frame.addEventListener('load', () => loader.remove());
+    frame.addEventListener('error', () => loader.remove());
+    host.appendChild(frame);
+  } else {
+    const kept = frame; // preserved across render — browser keeps it in the document
+    return kept;
+  }
+  return frame;
 }
 
-/* ------------------------------ HIRING ------------------------------ */
-const hiringState = { q: '', status: '', mode: 'board' };
+function renderTabsbar(sys, active) {
+  const bar = $('#tabsbar');
+  /* systems without internal tabs (single-view apps) get no floating bar */
+  if (!sys.tabs.length) {
+    bar.hidden = true;
+    bar.innerHTML = '';
+    return;
+  }
+  bar.hidden = false;
+  bar.style.setProperty('--c', sys.colour);
+  bar.innerHTML = `
+    <span class="tabs-sys">${icon(sys.icon)}<b>${esc(sys.label)}</b></span>
+    <span class="tabs-sep"></span>
+    ${sys.tabs.map(t => `
+      <button type="button" class="tabs-tab ${t.id === active ? 'on' : ''}" data-sys="${sys.key}" data-tab="${t.id}">
+        ${esc(t.label)}
+      </button>`).join('')}
+    <div class="flex:1"></div>
+    <a class="tabs-open" href="${attr(sysUrl(sys, active))}" target="_blank" title="Open ${esc(sys.label)} full screen">
+      ${icon('arrow')}<span>Full view</span>
+    </a>`;
+}
 
-async function viewHiring(root) {
-  const [metrics, list] = await Promise.all([
-    api('/api/hiring/metrics'),
-    api(`/api/hiring/candidates?q=${encodeURIComponent(hiringState.q)}&status=${encodeURIComponent(hiringState.status)}&pageSize=60`)
-  ]);
-  const byStatus = {};
-  for (const c of list.items || []) (byStatus[c.status] = byStatus[c.status] || []).push(c);
-  const stages = ['OnBoarding', 'Attended to D0', 'Active', 'Inactive', 'OffBoarding'];
-
-  root.innerHTML = `
-    <div class="stats">
-      ${statCard({ label: 'Candidates', value: metrics.total, icon: 'hire', colour: 'var(--purple)', foot: `${metrics.newThisWeek || 0} new this week` })}
-      ${statCard({ label: 'Hired', value: metrics.hired, icon: 'check', colour: 'var(--ok)', foot: 'Active + D0' })}
-      ${statCard({ label: 'On boarding', value: metrics.byStatus?.OnBoarding || 0, icon: 'clock', colour: 'var(--warn)', foot: 'in pipeline' })}
-      ${statCard({ label: 'Licence ≤ 30d', value: metrics.licenseExpiring || 0, icon: 'alert', colour: 'var(--bad)', foot: 'need renewal' })}
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <h2>Recruitment pipeline</h2><div style="flex:1"></div>
-        <input class="input-sm" id="hSearch" placeholder="Search candidates" value="${attr(hiringState.q)}" />
-        <select class="select" id="hStatus">
-          <option value="">All stages</option>
-          ${stages.map(s => `<option ${hiringState.status === s ? 'selected' : ''}>${s}</option>`).join('')}
-        </select>
-      </div>
-      <div class="card-body">
-        <div class="board">
-          ${stages.map(stage => `
-            <section class="col" data-stage="${attr(stage)}">
-              <header class="col-head"><span class="dot" style="width:7px;height:7px;border-radius:99px;background:${stageColour(stage)}"></span>
-                <b>${esc(stage)}</b><span class="n">${(byStatus[stage] || []).length}</span></header>
-              <div class="col-body">
-                ${(byStatus[stage] || []).map(c => `
-                  <article class="kcard" draggable="true" data-cand="${attr(c.id)}">
-                    <b>${esc(c.fullName)}</b>
-                    <small>${esc(c.nationalId)}</small>
-                    <div class="row">
-                      <span class="chip mute">${esc(c.branch)}</span>
-                      <span class="chip ${c.employmentType === 'Full Time' ? 'purple' : 'turq'}">${c.employmentType === 'Full Time' ? 'FT' : 'PT'}</span>
-                    </div>
-                  </article>`).join('') || '<div class="empty" style="padding:14px">Drop here</div>'}
-              </div>
-            </section>`).join('')}
-        </div>
-      </div>
-    </div>`;
-
-  $('#hSearch')?.addEventListener('input', debounce(() => { hiringState.q = $('#hSearch').value; viewHiring(root); }, 280));
-  $('#hStatus')?.addEventListener('change', (e) => { hiringState.status = e.target.value; viewHiring(root); });
-
-  $$('[data-cand]', root).forEach(card => {
-    card.addEventListener('click', () => openCandidate(card.dataset.cand, () => viewHiring(root)));
-    card.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', card.dataset.cand);
-      e.dataTransfer.effectAllowed = 'move';
-      card.classList.add('dragging');
-    });
-    card.addEventListener('dragend', () => card.classList.remove('dragging'));
-  });
-  $$('.col', root).forEach(col => {
-    col.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('over'); });
-    col.addEventListener('dragleave', () => col.classList.remove('over'));
-    col.addEventListener('drop', async (e) => {
-      e.preventDefault(); col.classList.remove('over');
-      const id = e.dataTransfer.getData('text/plain');
-      if (!id) return;
+function setSystemTab(sys, tab, { fromFrame = false } = {}) {
+  S.sysTab[sys.key] = tab;
+  if (!fromFrame) {
+    const frame = sysFrameOf(sys.key);
+    if (frame) {
       try {
-        await api(`/api/hiring/candidates/${id}/status`, { method: 'POST', body: { status: col.dataset.stage } });
-        toast(`Moved to ${col.dataset.stage}`);
-        viewHiring(root);
-      } catch { /* handled */ }
-    });
-  });
+        const win = frame.contentWindow;
+        if (sys.key === 'roster' && win) win.location.hash = tab === 'dashboard' ? '' : `#${tab}`;
+        else if (sys.key === 'hiring' && win) win.postMessage({ type: 'bk:setView', view: tab }, '*');
+        else frame.src = sysUrl(sys, tab); // ticketing portal ⇄ admin page
+      } catch {
+        frame.src = sysUrl(sys, tab);
+      }
+    }
+  } else if (sys.key === 'tickets') {
+    const frame = sysFrameOf(sys.key);
+    if (frame) frame.src = sysUrl(sys, tab);
+  }
+  renderTabsbar(sys, tab);
+  const base = `#/system/${sys.key}`;
+  const first = tab === sys.tabs[0]?.id;
+  const next = first ? base : `${base}?tab=${tab}`;
+  if (location.hash !== next) history.replaceState(null, '', next);
 }
 
-const stageColour = (s) => ({
-  OnBoarding: '#7C5CFF', 'Attended to D0': '#3B82F6', Active: '#22C55E', Inactive: '#6E6D85', OffBoarding: '#EF4444'
-}[s] || '#7C5CFF');
+/** Main view for every member system: floating tab bar + embedded workspace. */
+function viewSystem(_view, sys) {
+  if (!sys) return;
+  showSystemView(sys.key); // native container hides; the embed stage shows
 
-async function openCandidate(id, refresh) {
-  const data = await api(`/api/hiring/candidates/${id}`);
-  const c = data.candidate;
-  const converted = data.link;
-  const docs = (c.documents || []).map(d => `
-    <a href="/api/hiring/documents/${d.id}" target="_blank" style="display:block;border-radius:10px;overflow:hidden;border:1px solid var(--line)">
-      <img src="/api/hiring/documents/${d.id}${d.hasThumb ? '?thumb=1' : ''}" alt="${attr(d.kind)}" style="width:100%;height:78px;object-fit:cover;display:block" />
-      <div style="padding:5px 7px;font-size:10px;color:var(--text-3)">${esc(d.kind.replace('_', ' '))}</div>
-    </a>`).join('');
+  const tab = sys.tabs.length && S.params.tab && sys.tabs.some(t => t.id === S.params.tab)
+    ? S.params.tab
+    : sys.tabs[0]?.id;
+  /* only (re)point the URL when the frame must show a different tab.
+     NB: detect first mount BEFORE calling mountFrame (it creates the frame). */
+  const mounted = !sysFrameOf(sys.key);
+  const frame = mountFrame(sys);
+  if (mounted || S.sysTab[sys.key] !== tab) frame.src = sysUrl(sys, tab);
+  S.sysTab[sys.key] = tab;
+  renderTabsbar(sys, tab);
 
-  openDrawer(c.fullName, `
-    <div style="display:flex;gap:14px;align-items:center">
-      ${c.photo
-        ? `<img src="/api/hiring/documents/${c.photo}${c.hasThumb ? '?thumb=1' : ''}" style="width:54px;height:54px;border-radius:14px;object-fit:cover" alt="" />`
-        : `<span class="avatar" style="width:54px;height:54px;font-size:18px;background:linear-gradient(135deg,#7C5CFF,#14D9C4)">${initials(c.fullName)}</span>`}
-      <div><b style="font-size:15px">${esc(c.fullName)}</b>
-        <div style="margin-top:4px">${statusChip(c.status)}</div></div>
-    </div>
-    <dl class="kv">
-      <dt>National ID</dt><dd class="num">${esc(c.nationalId)}</dd>
-      <dt>Phone</dt><dd class="num">${esc(c.phone)}</dd>
-      <dt>Branch</dt><dd>${esc(c.branch)}</dd>
-      <dt>Type</dt><dd>${esc(c.employmentType)}</dd>
-      <dt>Licence</dt><dd>${fmtDate(c.licenseStart)} → ${fmtDate(c.licenseEnd)}</dd>
-      <dt>Plate</dt><dd>${esc(c.plate || '—')}</dd>
-      <dt>Outlook</dt><dd>${esc(c.outlook || '—')}</dd>
-    </dl>
-    ${docs ? `<div><div class="nav-label" style="padding:0 0 6px">Documents</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${docs}</div></div>` : ''}
-    ${(c.events || []).length ? `<div><div class="nav-label" style="padding:0 0 6px">History</div>
-      <div class="feed">${c.events.slice(0, 8).map(e => `<div class="feed-item">
-        <span class="dot" style="background:var(--purple)"></span>
-        <span class="t">${e.type === 'status' ? `Status → <b>${esc(e.toStatus)}</b>` : esc(e.type)}</span>
-        <time>${ago(e.createdAt)}</time></div>`).join('')}</div></div>` : ''}
-    ${converted ? `<div class="chip ok" style="justify-self:start">Already an employee · #${esc(converted.right_id)}</div>` : ''}`,
-    `<button class="btn" data-close>Close</button>
-     ${!converted && S.perms.has('hiring.convert') && ['Attended to D0', 'Active'].includes(c.status)
-        ? `<button class="btn primary" id="convertBtn">${icon('arrow')} Convert to employee</button>` : ''}`);
-
-  $('#convertBtn')?.addEventListener('click', () => openConvert(c, data.suggestedCode, () => { closeDrawer(); refresh?.(); }));
+  $('#tabsbar').onclick = (e) => {
+    const b = e.target.closest('.tabs-tab[data-tab]');
+    if (b) setSystemTab(sys, b.dataset.tab);
+  };
 }
 
-function openConvert(c, suggestedCode, done) {
-  openDrawer(`Convert · ${c.fullName}`, `
-    <div class="chip purple" style="justify-self:start">${icon('hire')} Hiring → Roster</div>
-    <p style="font-size:12.5px;color:var(--text-2);margin:0">
-      A new employee record will be created in the Roster system and linked to this candidate.
-      This runs once and is fully audited.</p>
-    <div class="field"><label>Employee name</label><input class="input" id="cvName" value="${attr(c.fullName)}" /></div>
-    <div class="field"><label>Phone</label><input class="input" id="cvPhone" value="${attr(c.phone)}" /></div>
-    <div class="field"><label>Branch</label>
-      <select class="input" id="cvBranch">
-        <option value="QCD 1" ${c.branch === 'QCD1' ? 'selected' : ''}>QCD 1</option>
-        <option value="QCD 2" ${c.branch === 'QCD2' ? 'selected' : ''}>QCD 2</option>
-      </select></div>
-    <div class="field"><label>Employment type</label>
-      <select class="input" id="cvType">
-        <option value="FT" ${c.employmentType === 'Full Time' ? 'selected' : ''}>Full Time</option>
-        <option value="PT" ${c.employmentType === 'Part Time' ? 'selected' : ''}>Part Time</option>
-      </select></div>
-    <div class="field"><label>Shift</label><input class="input" id="cvShift" placeholder="e.g. 08:00-16:00" /></div>
-    <div class="field"><label>Employee code</label><input class="input num" id="cvCode" value="${attr(suggestedCode || '')}" /></div>`,
-    `<button class="btn" data-close>Cancel</button><button class="btn primary" id="cvSubmit">Convert & create employee</button>`);
-
-  $('#cvSubmit').addEventListener('click', async (e) => {
-    const btn = e.currentTarget;
-    btn.disabled = true;
-    try {
-      const res = await api(`/api/hiring/candidates/${c.id}/convert`, {
-        method: 'POST',
-        body: {
-          branch: $('#cvBranch').value, employmentType: $('#cvType').value,
-          shift: $('#cvShift').value.trim(), code: $('#cvCode').value.trim(), dayOff: 'Friday'
-        }
-      });
-      toast(`Employee ${res.employee.code} created`);
-      done?.();
-      loadNotifications();
-    } catch { btn.disabled = false; }
-  });
+/* first visit in this app session (before the system's iframe exists) */
+function isFirstMount(sys) {
+  return !sysFrameOf(sys.key);
 }
 
-/* ------------------------------ TICKETS ------------------------------ */
-const ticketState = { q: '', bucket: '', page: 1 };
-
-async function viewTickets(root) {
-  const [metrics, data] = await Promise.all([
-    api('/api/tickets/metrics'),
-    api(`/api/tickets?q=${encodeURIComponent(ticketState.q)}&bucket=${encodeURIComponent(ticketState.bucket)}&page=${ticketState.page}&pageSize=12`)
-  ]);
-
-  root.innerHTML = `
-    <div class="stats">
-      ${statCard({ label: 'Open', value: metrics.open, icon: 'ticket', colour: 'var(--info)', foot: `${metrics.progress || 0} in review` })}
-      ${statCard({ label: 'Action needed', value: metrics.action, icon: 'alert', colour: 'var(--warn)', foot: 'come to office' })}
-      ${statCard({ label: 'Resolved', value: metrics.resolved, icon: 'check', colour: 'var(--ok)', foot: `of ${metrics.total}` })}
-      ${statCard({ label: 'New today', value: metrics.today, icon: 'spark', colour: 'var(--turq)', foot: `${metrics.overdue || 0} overdue` })}
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>Tickets</h2><div style="flex:1"></div>
-        <input class="input-sm" id="tSearch" placeholder="Search code / name / text" value="${attr(ticketState.q)}" />
-        <select class="select" id="tBucket">
-          <option value="">All</option>
-          <option value="open" ${ticketState.bucket === 'open' ? 'selected' : ''}>Open</option>
-          <option value="progress" ${ticketState.bucket === 'progress' ? 'selected' : ''}>In review</option>
-          <option value="action" ${ticketState.bucket === 'action' ? 'selected' : ''}>Action needed</option>
-          <option value="resolved" ${ticketState.bucket === 'resolved' ? 'selected' : ''}>Resolved</option>
-        </select>
-        ${S.perms.has('tickets.manage') ? `<button class="btn primary sm" id="newTicket">${icon('plus')} New ticket</button>` : ''}
-      </div>
-      <div class="card-body">
-        <div class="table-wrap">
-          <table class="tbl"><thead><tr>
-            <th>#</th><th>Courier</th><th>Category</th><th>Status</th><th>Updated</th>
-          </tr></thead><tbody>
-            ${(data.items || []).map(t => `<tr data-ticket="${t.id}" style="cursor:pointer">
-              <td class="num">#${t.id}</td>
-              <td><span class="strong">${esc(t.courierName || t.code)}</span><br><small style="color:var(--text-3)">${esc(t.code)}</small></td>
-              <td>${esc(t.category)}${t.subType ? ` · <span style="color:var(--text-3)">${esc(t.subType)}</span>` : ''}</td>
-              <td>${statusChip(t.status)}</td>
-              <td style="white-space:nowrap">${ago(t.updatedAt || t.createdAt)}</td>
-            </tr>`).join('') || '<tr><td colspan="5"><div class="empty"><b>No tickets</b>Nothing matches these filters.</div></td></tr>'}
-          </tbody></table>
-        </div>
-        ${pager(data)}
-      </div>
-    </div>`;
-
-  $('#tSearch')?.addEventListener('input', debounce(() => { ticketState.q = $('#tSearch').value; ticketState.page = 1; viewTickets(root); }, 280));
-  $('#tBucket')?.addEventListener('change', (e) => { ticketState.bucket = e.target.value; ticketState.page = 1; viewTickets(root); });
-  wirePager(root, data, (p) => { ticketState.page = p; viewTickets(root); });
-  $$('[data-ticket]', root).forEach(tr => tr.addEventListener('click', () => openTicket(tr.dataset.ticket, () => viewTickets(root))));
-  $('#newTicket')?.addEventListener('click', () => newTicket(() => viewTickets(root)));
-}
-
-async function openTicket(id, refresh) {
-  const data = await api(`/api/tickets/${id}`);
-  const t = data.ticket;
-  openDrawer(`Ticket #${t.id}`, `
-    <div style="display:flex;gap:8px;flex-wrap:wrap">${statusChip(t.status)}
-      <span class="chip mute">${esc(t.category)}</span>
-      ${data.employee ? `<span class="chip turq">${esc(data.employee.name)}</span>` : ''}</div>
-    <dl class="kv">
-      <dt>Courier</dt><dd>${esc(t.courierName || '—')} · ${esc(t.code)}</dd>
-      <dt>Issue date</dt><dd>${fmtDate(t.issueDate)}</dd>
-      <dt>Description</dt><dd>${esc(t.description || '—')}</dd>
-      <dt>Admin note</dt><dd>${esc(t.adminNote || '—')}</dd>
-    </dl>
-    <div id="ticketActions"></div>
-    <div><div class="nav-label" style="padding:0 0 6px">Timeline</div>
-      <div class="feed" id="ticketComments">
-        ${data.comments.map(c => `<div class="feed-item"><span class="dot" style="background:var(--turq)"></span>
-          <span class="t"><b>${esc(c.user_name || 'system')}</b> ${esc(c.body)}</span><time>${ago(c.created_at)}</time></div>`).join('')
-          || '<div class="empty" style="padding:12px">No comments yet</div>'}
-      </div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <input class="input" id="commentBox" placeholder="Add a comment…" />
-        <button class="btn sm" id="commentSend">Send</button>
-      </div>
-    </div>`,
-    S.perms.has('tickets.manage') ? `
-      <select class="select" id="tStatus" style="flex:1">
-        ${['قيد المراجعة', 'يتم المراجعة', 'لازم تيجي المكتب', 'اتحلت', 'مرفوض'].map(s => `<option ${s === t.status ? 'selected' : ''}>${s}</option>`).join('')}
-      </select>
-      <button class="btn primary" id="tSave">Save</button>` : '');
-
-  $('#commentSend')?.addEventListener('click', async () => {
-    const body = $('#commentBox').value.trim();
-    if (!body) return;
-    await api(`/api/tickets/${t.id}/comments`, { method: 'POST', body: { body } });
-    $('#commentBox').value = '';
-    openTicket(t.id, refresh);
-  });
-  $('#tSave')?.addEventListener('click', async () => {
-    await api(`/api/tickets/${t.id}`, { method: 'PATCH', body: { status: $('#tStatus').value } });
-    toast('Ticket updated');
-    closeDrawer(); refresh?.();
-  });
-}
-
-function newTicket(done) {
-  openDrawer('New ticket', `
-    <div class="field"><label>Courier DAS code</label><input class="input" id="ntCode" placeholder="DAS-105" /></div>
-    <div class="field"><label>Courier name</label><input class="input" id="ntName" placeholder="Optional" /></div>
-    <div class="field"><label>Category</label>
-      <select class="input" id="ntCat"><option>الشيفت</option><option>السلف</option><option>الرخصة</option><option>أخرى</option></select></div>
-    <div class="field"><label>Subject</label><input class="input" id="ntSub" placeholder="Short subject" /></div>
-    <div class="field"><label>Description</label><textarea class="input" id="ntDesc" rows="4" placeholder="What happened?"></textarea></div>`,
-    `<button class="btn" data-close>Cancel</button><button class="btn primary" id="ntSave">Create ticket</button>`);
-  $('#ntSave').addEventListener('click', async (e) => {
-    e.currentTarget.disabled = true;
-    try {
-      await api('/api/tickets', {
-        method: 'POST',
-        body: {
-          code: $('#ntCode').value.trim(), courierName: $('#ntName').value.trim(),
-          category: $('#ntCat').value, subType: $('#ntSub').value.trim(), description: $('#ntDesc').value.trim()
-        }
-      });
-      toast('Ticket created');
-      closeDrawer(); done?.(); loadNotifications();
-    } catch { e.currentTarget.disabled = false; }
-  });
-}
-
+/* the embedded systems report their own navigation ("the tab bar follows along") */
+addEventListener('message', (e) => {
+  if (e.origin !== location.origin) return;
+  const d = e.data || {};
+  if (d.type !== 'fb:tab' || !d.sys) return;
+  const sys = systemBy(d.sys);
+  const tab = String(d.tab || '');
+  if (!sys || !sys.tabs.some(t => t.id === tab) || S.route !== `system/${sys.key}`) return;
+  if (S.sysTab[sys.key] === tab) return;
+  setSystemTab(sys, tab, { fromFrame: true });
+  for (const b of $$('#tabsbar .tabs-tab')) b.classList.toggle('on', b.dataset.tab === tab);
+});
 /* ------------------------------ REPORTS ------------------------------ */
 async function viewReports(root) {
   const [dash, fines] = await Promise.all([api('/api/dashboard'), api('/api/roster/fines')]);
@@ -1050,14 +730,18 @@ document.addEventListener('click', (e) => {
 
 /* ------------------------------ BOOT ------------------------------ */
 (async function boot() {
-  // The intro plays once per browser (skippable), then the login/app appears.
-  intro.play({ done: () => {} });
-  try {
-    const me = await api('/api/auth/me', { quiet: true });
-    setSession(me.user, me.csrf);
-    showApp();
-    navigate(location.hash || '#/overview', { replace: true });
-  } catch {
-    showLogin();
-  }
+  /* Cinematic intro on every visit — but the session never waits for it:
+     auth runs in parallel, whatever resolves later is revealed first. */
+  const appReady = (async () => {
+    try {
+      const me = await api('/api/auth/me', { quiet: true });
+      setSession(me.user, me.csrf);
+      showApp();
+      navigate(location.hash || '#/system/hiring', { replace: true });
+    } catch {
+      showLogin();
+    }
+  })();
+  intro.play({ done: () => { /* app is already rendered underneath */ } });
+  await appReady;
 })();
