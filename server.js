@@ -131,9 +131,7 @@ app.get('/api/dashboard', requireAuth, requirePermission('dashboard.view'), (req
     hiring: hiringMetrics,
     tickets: ticketMetrics,
     trend: roster.weekTrend(date),
-    pipeline: hiring.available() ? hiring.list({ limit: 200 }).items.reduce((acc, c) => {
-      acc[c.status] = (acc[c.status] || 0) + 1; return acc;
-    }, {}) : {},
+    candidates: hiring.available() ? hiring.list({ limit: 5, sort: 'newest' }).items : [],
     activity,
     modules: { roster: roster.available(), hiring: hiring.available(), ticketing: ticketing.available() },
     users: users.count()
@@ -220,10 +218,6 @@ app.get('/api/hiring/candidates', requireAuth, requirePermission('hiring.view'),
 
 app.get('/api/hiring/metrics', requireAuth, requirePermission('hiring.view'), (_req, res) => {
   ok(res, hiring.metrics());
-});
-
-app.get('/api/hiring/pipeline', requireAuth, requirePermission('hiring.view'), (req, res) => {
-  ok(res, hiring.pipeline({ q: String(req.query.q || ''), branch: String(req.query.branch || '') }));
 });
 
 app.get('/api/hiring/candidates/:id', requireAuth, requirePermission('hiring.view'), (req, res) => {

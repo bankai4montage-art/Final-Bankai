@@ -207,7 +207,7 @@ function renderNav() {
 const TITLES = {
   overview: ['Overview', 'Unified operations across all three systems'],
   roster: ['Roster & Attendance', 'Employees, shifts and daily attendance'],
-  hiring: ['Hiring', 'Candidate pipeline and conversion'],
+  hiring: ['Hiring', 'Candidates, documents and conversion'],
   tickets: ['DAS Ticketing', 'Support tickets and requests'],
   reports: ['Reports', 'Cross-system analytics'],
   team: ['Team', 'Users, roles and permissions'],
@@ -246,7 +246,12 @@ function renderRoute() {
     overview: viewOverview, roster: viewRoster, hiring: viewHiring,
     tickets: viewTickets, reports: viewReports, team: viewTeam, settings: viewSettings
   }[S.route];
-  (fn || viewOverview)(view).catch(err => {
+  (fn || viewOverview)(view).then(() => {
+    // deep links coming from notifications / global search
+    if (S.route === 'hiring' && S.params.candidate) openCandidate(S.params.candidate, () => viewHiring(view));
+    if (S.route === 'tickets' && S.params.ticket) openTicket(S.params.ticket, () => viewTickets(view));
+    if (S.route === 'roster' && S.params.employee) openEmployee(S.params.employee);
+  }).catch(err => {
     console.error(err);
     view.innerHTML = `<div class="card"><div class="card-body"><div class="empty"><b>Could not load this view</b>${esc(err.message)}</div></div></div>`;
   });
@@ -366,7 +371,7 @@ $('#globalSearch').addEventListener('input', (e) => {
           <div class="nav-label" style="padding:0 0 6px">${esc(g.label)}</div>
           <div style="display:grid;gap:4px">
             ${g.items.map(it => `
-              <a class="kcard" style="cursor:pointer" data-link="${attr(it.link)}">
+              <a class="sresult" data-link="${attr(it.link)}">
                 <b>${esc(it.title)}</b><small>${esc(it.subtitle || '')} ${it.meta ? '· ' + esc(it.meta) : ''}</small>
               </a>`).join('')}
           </div>
@@ -420,16 +425,18 @@ async function viewOverview(root) {
       </div>
 
       <div class="card">
-        <div class="card-head"><h2>Hiring pipeline</h2></div>
+        <div class="card-head"><h2>Latest candidates</h2><div style="flex:1"></div>
+          <a class="btn sm ghost" href="#/hiring">Open hiring ${icon('arrow')}</a></div>
         <div class="card-body">
-          ${Object.entries(h.byStatus || {}).map(([k, v]) => `
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">
-              <span style="width:104px;font-size:11.5px;color:var(--text-2)">${esc(k)}</span>
-              <div style="flex:1;height:7px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden">
-                <i style="display:block;height:100%;width:${Math.round((v / Math.max(1, h.total)) * 100)}%;background:linear-gradient(90deg,var(--purple),var(--turq))"></i>
-              </div>
-              <b style="font-size:12px;width:24px;text-align:end">${v}</b>
-            </div>`).join('') || '<div class="empty">No candidates yet</div>'}
+          ${(d.candidates || []).map(c => `
+            <a class="sresult" href="#/hiring?candidate=${attr(c.id)}">
+              <span class="avatar" style="width:28px;height:28px;font-size:11px;background:linear-gradient(135deg,#7C5CFF,#14D9C4)">${initials(c.fullName)}</span>
+              <span style="min-width:0;flex:1">
+                <b>${esc(c.fullName)}</b>
+                <small>${esc(c.branch)} · ${esc(c.employmentType)}</small>
+              </span>
+              ${statusChip(c.status)}
+            </a>`).join('') || '<div class="empty">No candidates yet</div>'}
           <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
             <span class="chip purple">${h.total || 0} total</span>
             <span class="chip turq">${h.newThisWeek || 0} new this week</span>
@@ -597,87 +604,66 @@ async function openEmployee(id) {
 }
 
 /* ------------------------------ HIRING ------------------------------ */
-const hiringState = { q: '', status: '', mode: 'board' };
+const hiringState = { q: '', status: '', page: 1 };
 
 async function viewHiring(root) {
-  const [metrics, list] = await Promise.all([
+  const [metrics, data] = await Promise.all([
     api('/api/hiring/metrics'),
-    api(`/api/hiring/candidates?q=${encodeURIComponent(hiringState.q)}&status=${encodeURIComponent(hiringState.status)}&pageSize=60`)
+    api(`/api/hiring/candidates?q=${encodeURIComponent(hiringState.q)}&status=${encodeURIComponent(hiringState.status)}&page=${hiringState.page}&pageSize=12`)
   ]);
-  const byStatus = {};
-  for (const c of list.items || []) (byStatus[c.status] = byStatus[c.status] || []).push(c);
   const stages = ['OnBoarding', 'Attended to D0', 'Active', 'Inactive', 'OffBoarding'];
 
   root.innerHTML = `
     <div class="stats">
       ${statCard({ label: 'Candidates', value: metrics.total, icon: 'hire', colour: 'var(--purple)', foot: `${metrics.newThisWeek || 0} new this week` })}
       ${statCard({ label: 'Hired', value: metrics.hired, icon: 'check', colour: 'var(--ok)', foot: 'Active + D0' })}
-      ${statCard({ label: 'On boarding', value: metrics.byStatus?.OnBoarding || 0, icon: 'clock', colour: 'var(--warn)', foot: 'in pipeline' })}
+      ${statCard({ label: 'On boarding', value: metrics.byStatus?.OnBoarding || 0, icon: 'clock', colour: 'var(--warn)', foot: 'in progress' })}
       ${statCard({ label: 'Licence ≤ 30d', value: metrics.licenseExpiring || 0, icon: 'alert', colour: 'var(--bad)', foot: 'need renewal' })}
     </div>
 
     <div class="card">
       <div class="card-head">
-        <h2>Recruitment pipeline</h2><div style="flex:1"></div>
-        <input class="input-sm" id="hSearch" placeholder="Search candidates" value="${attr(hiringState.q)}" />
+        <h2>All candidates</h2>
+        <div style="flex:1"></div>
+        <input class="input-sm" id="hSearch" placeholder="Search name / ID / phone" value="${attr(hiringState.q)}" />
         <select class="select" id="hStatus">
-          <option value="">All stages</option>
+          <option value="">All statuses</option>
           ${stages.map(s => `<option ${hiringState.status === s ? 'selected' : ''}>${s}</option>`).join('')}
         </select>
       </div>
       <div class="card-body">
-        <div class="board">
-          ${stages.map(stage => `
-            <section class="col" data-stage="${attr(stage)}">
-              <header class="col-head"><span class="dot" style="width:7px;height:7px;border-radius:99px;background:${stageColour(stage)}"></span>
-                <b>${esc(stage)}</b><span class="n">${(byStatus[stage] || []).length}</span></header>
-              <div class="col-body">
-                ${(byStatus[stage] || []).map(c => `
-                  <article class="kcard" draggable="true" data-cand="${attr(c.id)}">
-                    <b>${esc(c.fullName)}</b>
-                    <small>${esc(c.nationalId)}</small>
-                    <div class="row">
-                      <span class="chip mute">${esc(c.branch)}</span>
-                      <span class="chip ${c.employmentType === 'Full Time' ? 'purple' : 'turq'}">${c.employmentType === 'Full Time' ? 'FT' : 'PT'}</span>
-                    </div>
-                  </article>`).join('') || '<div class="empty" style="padding:14px">Drop here</div>'}
-              </div>
-            </section>`).join('')}
+        <div class="table-wrap">
+          <table class="tbl"><thead><tr>
+            <th>Candidate</th><th>National ID</th><th>Branch</th><th>Type</th><th>Status</th><th>Licence</th><th>Updated</th>
+          </tr></thead><tbody>
+            ${(data.items || []).map(c => `<tr data-cand="${attr(c.id)}" style="cursor:pointer">
+              <td><div style="display:flex;align-items:center;gap:9px">
+                ${c.photo
+                  ? `<img src="/api/hiring/documents/${c.photo}${c.hasThumb ? '?thumb=1' : ''}" alt="" style="width:28px;height:28px;border-radius:9px;object-fit:cover" />`
+                  : `<span class="avatar" style="width:28px;height:28px;font-size:11px;background:linear-gradient(135deg,#7C5CFF,#14D9C4)">${initials(c.fullName)}</span>`}
+                <span class="strong">${esc(c.fullName)}</span></div></td>
+              <td class="num">${esc(c.nationalId)}</td>
+              <td>${esc(c.branch)}</td>
+              <td><span class="chip ${c.employmentType === 'Full Time' ? 'purple' : 'turq'}">${c.employmentType === 'Full Time' ? 'FT' : 'PT'}</span></td>
+              <td>${statusChip(c.status)}</td>
+              <td style="white-space:nowrap">${fmtDate(c.licenseEnd)}</td>
+              <td style="white-space:nowrap">${ago(c.updatedAt || c.createdAt)}</td>
+            </tr>`).join('') || '<tr><td colspan="7"><div class="empty"><b>No candidates</b>Nothing matches these filters.</div></td></tr>'}
+          </tbody></table>
         </div>
+        ${pager(data)}
       </div>
     </div>`;
 
-  $('#hSearch')?.addEventListener('input', debounce(() => { hiringState.q = $('#hSearch').value; viewHiring(root); }, 280));
-  $('#hStatus')?.addEventListener('change', (e) => { hiringState.status = e.target.value; viewHiring(root); });
-
-  $$('[data-cand]', root).forEach(card => {
-    card.addEventListener('click', () => openCandidate(card.dataset.cand, () => viewHiring(root)));
-    card.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', card.dataset.cand);
-      e.dataTransfer.effectAllowed = 'move';
-      card.classList.add('dragging');
-    });
-    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+  $('#hSearch')?.addEventListener('input', debounce(() => {
+    hiringState.q = $('#hSearch').value; hiringState.page = 1; viewHiring(root);
+  }, 280));
+  $('#hStatus')?.addEventListener('change', (e) => {
+    hiringState.status = e.target.value; hiringState.page = 1; viewHiring(root);
   });
-  $$('.col', root).forEach(col => {
-    col.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('over'); });
-    col.addEventListener('dragleave', () => col.classList.remove('over'));
-    col.addEventListener('drop', async (e) => {
-      e.preventDefault(); col.classList.remove('over');
-      const id = e.dataTransfer.getData('text/plain');
-      if (!id) return;
-      try {
-        await api(`/api/hiring/candidates/${id}/status`, { method: 'POST', body: { status: col.dataset.stage } });
-        toast(`Moved to ${col.dataset.stage}`);
-        viewHiring(root);
-      } catch { /* handled */ }
-    });
-  });
+  wirePager(root, data, (p) => { hiringState.page = p; viewHiring(root); });
+  $$('[data-cand]', root).forEach(tr => tr.addEventListener('click', () => openCandidate(tr.dataset.cand, () => viewHiring(root))));
 }
-
-const stageColour = (s) => ({
-  OnBoarding: '#7C5CFF', 'Attended to D0': '#3B82F6', Active: '#22C55E', Inactive: '#6E6D85', OffBoarding: '#EF4444'
-}[s] || '#7C5CFF');
 
 async function openCandidate(id, refresh) {
   const data = await api(`/api/hiring/candidates/${id}`);

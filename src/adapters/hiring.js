@@ -122,12 +122,6 @@ export const hiring = {
     };
   },
 
-  /** Pipeline board: all candidates in one payload. */
-  pipeline({ q = '', branch = '' } = {}) {
-    const res = hiring.list({ q, branch, limit: 200, offset: 0, sort: 'newest' });
-    return res;
-  },
-
   setStatus(id, status) {
     const c = conn();
     if (!c) throw new Error('Hiring database is not available.');

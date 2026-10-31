@@ -27,7 +27,7 @@ cinematic command center, without rewriting or damaging any of them.
 ### Unified dashboard
 - Live numbers from all three databases: workforce (present/late/absent/unmarked/fines),
   hiring funnel and ticket backlog.
-- 7-day attendance chart, pipeline breakdown, cross-system activity feed.
+- 7-day attendance chart, latest candidates and a cross-system activity feed.
 
 ### Roster & Attendance
 - Employees with branch / shift / FT-PT / day-off, searchable and paginated.
@@ -35,8 +35,8 @@ cinematic command center, without rewriting or damaging any of them.
   writes to the original attendance table (fines included).
 
 ### Hiring
-- Visual pipeline (OnBoarding → Attended to D0 → Active → Inactive → OffBoarding) with
-  drag & drop, candidate drawer, documents and history.
+- Candidate list with search, status filter and pagination; a detailed drawer with
+  documents, licence, history and status changes.
 - **Convert to employee** — the cross-system bridge: creates the roster employee,
   allocates an unused `DAS-###` code, links candidate ↔ employee, marks the candidate
   Active, and writes an audit entry. Idempotent and duplicate-safe.
@@ -133,7 +133,7 @@ Final-Bankai/
 | GET | `/api/roster/employees` · `/api/roster/employees/:id` | `roster.view` |
 | GET | `/api/roster/attendance` · `/metrics` · `/fines` | `roster.view` |
 | POST | `/api/roster/attendance` | `attendance.manage` |
-| GET | `/api/hiring/candidates` · `/pipeline` · `/metrics` | `hiring.view` |
+| GET | `/api/hiring/candidates` · `/metrics` | `hiring.view` |
 | POST | `/api/hiring/candidates/:id/status` | `hiring.manage` |
 | POST | `/api/hiring/candidates/:id/convert` | `hiring.convert` |
 | GET | `/api/tickets` · `/api/tickets/:id` · `/metrics` | `tickets.view` |

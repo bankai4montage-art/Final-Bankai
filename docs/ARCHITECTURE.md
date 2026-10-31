@@ -72,7 +72,7 @@ sessions (token, user_id, csrf, expires_at, …)
 |---|---|
 | `dashboard.view` | overview |
 | `roster.view` / `roster.manage` / `attendance.manage` | workforce read / employee edits / attendance writes |
-| `hiring.view` / `hiring.manage` / `hiring.convert` | pipeline read / stage changes / conversion |
+| `hiring.view` / `hiring.manage` / `hiring.convert` | candidates read / status changes / conversion |
 | `tickets.view` / `tickets.manage` | ticket read / create-update |
 | `reports.view`, `team.manage`, `settings.manage`, `audit.view` | analytics, users, settings, audit |
 
