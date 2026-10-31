@@ -351,10 +351,11 @@ function openDrawer(title, body, foot = '') {
   $('#drawerTitle').textContent = title;
   $('#drawerBody').innerHTML = body;
   $('#drawerFoot').innerHTML = foot;
-  requestAnimationFrame(() => {
+  // a timeout (not rAF) so backgrounded tabs also slide the drawer in
+  setTimeout(() => {
     $('#drawer').classList.add('open');
     $('#drawerOverlay').classList.add('open');
-  });
+  }, 50);
   return el;
 }
 function closeDrawer() {
@@ -705,19 +706,20 @@ async function viewReports(root) {
 /* ------------------------------ TEAM ------------------------------ */
 async function viewTeam(root) {
   const data = await api('/api/users');
+  const roleLabel = (k) => (data.roles || []).find(r => r.key === k)?.label || k;
   root.innerHTML = `
     <div class="card">
       <div class="card-head"><h2>Users</h2><div style="flex:1"></div>
-        <button class="btn primary sm" id="newUser">${icon('plus')} New user</button></div>
+        <button class="btn primary sm" id="newUser">${icon('plus')} Add user</button></div>
       <div class="card-body"><div class="table-wrap"><table class="tbl">
         <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Permissions</th><th>Last login</th><th></th></tr></thead>
         <tbody>${data.users.map(u => `<tr>
           <td><div style="display:flex;align-items:center;gap:9px">
             <span class="avatar" style="width:28px;height:28px;font-size:11px;background:${esc(u.avatar_color || '#7C5CFF')}">${initials(u.name)}</span>
             <div><span class="strong">${esc(u.name)}</span><br><small style="color:var(--text-3)">${esc(u.email)}</small></div></div></td>
-          <td><span class="chip purple">${esc(u.role.replace('_', ' '))}</span></td>
+          <td><span class="chip purple">${esc(roleLabel(u.role))}</span></td>
           <td>${u.status === 'active' ? '<span class="chip ok">active</span>' : '<span class="chip bad">suspended</span>'}</td>
-          <td class="num">${u.permissions.length}</td>
+          <td><span class="num" title="${attr(u.permissions.map(p => PERM_LABELS[p] || p).join(' · '))}">${u.permissions.length}</span></td>
           <td>${u.last_login_at ? ago(u.last_login_at) : 'never'}</td>
           <td><button class="btn sm" data-edit="${u.id}">Edit</button></td>
         </tr>`).join('')}</tbody></table></div></div>
@@ -728,13 +730,44 @@ async function viewTeam(root) {
   }));
 }
 
+const PERM_LABELS = {
+  'dashboard.view': 'Dashboard',
+  'roster.view': 'Roster · view', 'roster.manage': 'Roster · manage', 'attendance.manage': 'Attendance · mark',
+  'hiring.view': 'Hiring · view', 'hiring.manage': 'Hiring · manage', 'hiring.convert': 'Hiring · convert',
+  'tickets.view': 'Tickets · view', 'tickets.manage': 'Tickets · manage',
+  'reports.view': 'Reports', 'team.manage': 'Team · manage', 'settings.manage': 'Settings', 'audit.view': 'Audit log'
+};
+const PERM_GROUPS = [
+  ['Roster & Attendance', ['roster.view', 'roster.manage', 'attendance.manage']],
+  ['Hiring', ['hiring.view', 'hiring.manage', 'hiring.convert']],
+  ['DAS Ticketing', ['tickets.view', 'tickets.manage']],
+  ['Platform', ['dashboard.view', 'reports.view', 'team.manage', 'settings.manage', 'audit.view']]
+];
+
+const genPassword = () => {
+  const words = ['Bankai', 'Rawahel', 'Courier', 'Shift', 'Dynamo'], yr = new Date().getFullYear();
+  const w = words[Math.floor(Math.random() * words.length)];
+  const x = Math.floor(Math.random() * 90) + 10;
+  const s = '!@#$%'.charAt(Math.floor(Math.random() * 5));
+  return `${w}${x}${yr % 100}${s}`;
+};
+
 function userForm(user, data, done) {
   const isNew = !user;
-  openDrawer(isNew ? 'New user' : `Edit · ${user.name}`, `
-    <div class="field"><label>Name</label><input class="input" id="uName" value="${attr(user?.name || '')}" /></div>
-    <div class="field"><label>Email</label><input class="input" id="uEmail" value="${attr(user?.email || '')}" ${isNew ? '' : 'disabled'} /></div>
-    <div class="field"><label>${isNew ? 'Password' : 'New password (optional)'}</label>
-      <input class="input" id="uPass" type="password" placeholder="${isNew ? 'At least 8 characters' : 'Leave empty to keep'}" /></div>
+  const roleOfThis = data.roles.find(r => r.key === (user?.role || ''));
+
+  openDrawer(isNew ? 'Add user' : `Edit · ${user.name}`, `
+    <div class="field"><label>Name</label><input class="input" id="uName" value="${attr(user?.name || '')}" placeholder="Full name" /></div>
+    <div class="field"><label>Email</label><input class="input" id="uEmail" type="email" value="${attr(user?.email || '')}" placeholder="name@company.com" ${isNew ? '' : 'disabled'} /></div>
+    <div class="field">
+      <label>${isNew ? 'Password' : 'New password (optional)'}</label>
+      <div style="display:flex;gap:6px">
+        <input class="input" id="uPass" type="text" value="${isNew ? genPassword() : ''}"
+               placeholder="${isNew ? 'auto-generated — edit or keep' : 'leave empty to keep current'}" ${isNew ? '' : ''} />
+        <button class="btn sm" id="uGen" title="Generate another" style="flex:none">${icon('spark')}</button>
+      </div>
+      <small style="color:var(--text-3);font-size:11px">min 8 characters · copy it right after creating (it is not shown again).</small>
+    </div>
     <div class="field"><label>Role</label><select class="input" id="uRole">
       ${data.roles.map(r => `<option value="${r.key}" ${user?.role === r.key ? 'selected' : ''}>${esc(r.label)}</option>`).join('')}
     </select></div>
@@ -742,29 +775,71 @@ function userForm(user, data, done) {
       <option value="active" ${user?.status !== 'suspended' ? 'selected' : ''}>Active</option>
       <option value="suspended" ${user?.status === 'suspended' ? 'selected' : ''}>Suspended</option>
     </select></div>
-    ${isNew ? '' : `<div><div class="nav-label" style="padding:0 0 6px">Permission overrides</div>
-      <div style="display:grid;gap:4px">${data.permissions.map(p => `<label style="display:flex;gap:8px;align-items:center;font-size:12px">
-        <input type="checkbox" data-perm="${p}" ${user?.permissions?.includes(p) ? 'checked' : ''} /> ${p}</label>`).join('')}</div></div>`}`,
-    `<button class="btn" data-close>Cancel</button><button class="btn primary" id="uSave">${isNew ? 'Create' : 'Save'}</button>`);
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;padding:0 0 8px">
+        <b style="font-size:12px">Permissions</b>
+        <button class="btn sm ghost" id="uRoleDefaults" title="Check exactly this role's permissions">Load ${esc((user?.role ? data.roles.find(r => r.key === user.role)?.label : data.roles.find(r => r.key === $('#uRole')?.value)?.label) || 'role')} defaults</button>
+      </div>
+      <div style="display:grid;gap:10px">
+        ${PERM_GROUPS.map(([label, perms]) => `
+          <div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px">
+            <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3);padding-bottom:6px">${esc(label)}</div>
+            <div style="display:grid;gap:5px">
+              ${perms.map(p => { const on = isNew ? roleOfThis?.permissions?.includes(p) : user?.permissions?.includes(p); return `
+                <label style="display:flex;gap:9px;align-items:center;font-size:12.5px;color:var(--text-2)">${PERM_LABELS[p] || p}
+                  <input type="checkbox" data-perm="${p}" ${on ? 'checked' : ''} style="margin-inline-start:auto;accent-color:var(--purple);width:15px;height:15px" />
+                </label>`; }).join('')}
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`,
+    `<button class="btn" data-close>Cancel</button><button class="btn primary" id="uSave">${isNew ? 'Create user' : 'Save'}</button>`);
+
+  // refresh the "Load defaults" label whenever the role changes (initial sync too)
+  const roleSel = $('#uRole');
+  const genBtn = $('#uGen');
+  const syncRoleLabel = () => { const r = data.roles.find(x => x.key === roleSel.value); if (r) $('#uRoleDefaults').textContent = `Load ${r.label} defaults`; };
+  roleSel.addEventListener('change', syncRoleLabel);
+  genBtn.addEventListener('click', () => { $('#uPass').value = genPassword(); });
+  syncRoleLabel();
+
+  $('#uRoleDefaults').addEventListener('click', () => {
+    const role = data.roles.find(r => r.key === roleSel.value);
+    $$('[data-perm]').forEach(cb => { cb.checked = !!role.permissions.includes(cb.dataset.perm); });
+    toast(`Loaded ${role.label} permissions`);
+  });
+
+  const collectOverrides = () => $$('#drawer [data-perm]').map(cb => ({ perm: cb.dataset.perm, allowed: cb.checked }));
 
   $('#uSave').addEventListener('click', async (e) => {
-    e.currentTarget.disabled = true;
+    const btn = e.currentTarget;
+    const name = $('#uName').value.trim();
+    const pass = $('#uPass').value;
+    if (name.length < 2) { toast('Name is too short.', 'err'); return; }
+    if (isNew && pass.length < 8) { toast('Password must be at least 8 characters.', 'err'); return; }
+    if (!isNew && pass && pass.length < 8) { toast('New password must be at least 8 characters.', 'err'); return; }
+    btn.disabled = true;
     try {
+      let created = user;
       if (isNew) {
-        await api('/api/users', {
-          method: 'POST',
-          body: { name: $('#uName').value.trim(), email: $('#uEmail').value.trim(), password: $('#uPass').value, role: $('#uRole').value }
-        });
+        const res = await api('/api/users', { method: 'POST', body: { name, email: $('#uEmail').value.trim(), password: pass, role: roleSel.value } });
+        created = res.user;
+        // permissions chosen at creation are applied as overrides on the fresh record
+        const overrides = collectOverrides();
+        const rolePerms = data.roles.find(r => r.key === roleSel.value).permissions;
+        const differs = overrides.filter(o => rolePerms.includes(o.perm) !== o.allowed);
+        if (differs.length) await api(`/api/users/${created.id}`, { method: 'PATCH', body: { overrides } });
+        try { await navigator.clipboard.writeText(pass); toast(`User created — password copied: ${pass}`); }
+        catch { toast('User created — copy the password from the form before closing'); }
       } else {
-        const body = { name: $('#uName').value.trim(), role: $('#uRole').value, status: $('#uStatus').value };
-        if ($('#uPass').value) body.password = $('#uPass').value;
-        const overrides = $$('[data-perm]').map(cb => ({ perm: cb.dataset.perm, allowed: cb.checked }));
-        if (overrides.length) body.overrides = overrides;
+        const body = { name, role: roleSel.value, status: $('#uStatus').value };
+        if (pass) body.password = pass;
+        body.overrides = collectOverrides();
         await api(`/api/users/${user.id}`, { method: 'PATCH', body });
+        toast(pass ? 'User updated — share the new password securely' : 'User updated');
       }
-      toast(isNew ? 'User created' : 'User updated');
-      closeDrawer(); done?.();
-    } catch { e.currentTarget.disabled = false; }
+      closeDrawer(); done?.(); loadNotifications();
+    } catch { btn.disabled = false; }
   });
 }
 
