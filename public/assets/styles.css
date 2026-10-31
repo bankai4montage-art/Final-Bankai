@@ -87,8 +87,23 @@ body::before {
   position: fixed; inset: 0; z-index: 200; background: #05050A;
   display: grid; place-items: center; overflow: hidden;
 }
-#intro.out { animation: introOut .75s cubic-bezier(.5, 0, .78, .35) forwards; }
-@keyframes introOut { 35% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+#intro.out { animation: introBye .6s cubic-bezier(.7, 0, .25, 1) forwards; }
+/* the screen gets cut along the same slash — no lazy fade */
+@keyframes introBye {
+  0% { clip-path: polygon(-120% -120%, 220% -120%, 220% 220%, -120% 220%); opacity: 1; }
+  45% { opacity: 1; }
+  100% { clip-path: polygon(56% -14%, 128% 58%, 42% 128%, -14% 44%); opacity: 0; }
+}
+.in-cut {
+  position: absolute; inset: -50% -70%; z-index: 5; pointer-events: none; opacity: 0;
+  background: linear-gradient(115deg, transparent 46%, rgba(255,255,255,.95) 49.6%, #EF4444 50.2%, rgba(255,255,255,.25) 51.4%, transparent 56%);
+  transform: translate(-60%, -60%);
+}
+#intro.out .in-cut { animation: cutSweep .5s cubic-bezier(.15,.9,.1,1) forwards; }
+@keyframes cutSweep {
+  from { transform: translate(-55%, -55%) rotate(0deg); opacity: 1; }
+  to { transform: translate(55%, 55%) rotate(0deg); opacity: .95; }
+}
 
 /* skip-jump: everything lands in its final state instantly once */
 #intro.fast .in-mark        { opacity: 1 !important; transform: none !important; }
@@ -118,64 +133,61 @@ body::before {
 
 .in-stage { position: relative; z-index: 2; display: grid; place-items: center; text-align: center; gap: 20px; }
 
-/* brand mark: the Rawahel mark draws itself — tile pops, peak strokes in, dot pops */
+/* brand mark #4: navy tile pops → red slash STRIKES → 刀 draws itself */
 .in-mark {
   width: 108px; height: 108px; border-radius: 28px; display: grid; place-items: center;
   background: transparent;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.10), 0 30px 90px -22px rgba(37,99,235,.66);
-  opacity: 0; transform: scale(.62) translateY(16px);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.10), 0 26px 80px -22px rgba(239,68,68,.5);
+  opacity: 0; transform: scale(.55) rotate(-14deg);
   position: relative;
-  animation: inPopIn 1s var(--spring) .3s forwards, inBreathe 5s ease-in-out 2s infinite;
+  animation: inPopIn .55s cubic-bezier(.6, -0.28, .3, 1.55) .12s forwards, inBreathe 4s ease-in-out 2s infinite;
 }
-.in-mark svg { width: 100px; height: 100px; display: block; overflow: visible; filter: drop-shadow(0 18px 44px rgba(37,99,235,.55)); }
-/* tile: erase→fill wipe (clip sweep) */
-.in-mark .lg-tile { clip-path: inset(0 100% 0 0); animation: inTile .9s var(--ease) .45s forwards; }
+.in-mark svg { width: 100px; height: 100px; display: block; overflow: visible; filter: drop-shadow(0 16px 40px rgba(239,68,68,.42)); }
+.in-mark .lg-tile { clip-path: inset(0 100% 0 0); animation: inTile .45s cubic-bezier(.2,.9,.2,1) .22s forwards; }
 @keyframes inTile { to { clip-path: inset(0 0 0 0); } }
-/* peak: stroke draws itself like a blueprint sketch */
-.in-mark .lg-peak { stroke-dasharray: 100; stroke-dashoffset: 100; animation: inDraw .8s var(--ease) .85s forwards; }
-/* dot: springs in right after the peak */
-.in-mark .lg-dot { transform: scale(0); transform-origin: 28px 22px; animation: inDot .5s var(--spring) 1.35s forwards; }
-@keyframes inDot { to { transform: scale(1); } }
-.in-mark::after {
-  content: ''; position: absolute; inset: -1px; border-radius: 28px; pointer-events: none; overflow: hidden;
-  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.18) 50%, transparent 70%);
-  background-size: 250% 100%; background-position: 120% 0;
-  animation: inSweep 2.6s ease 1.9s 2;
-}
-@keyframes inSweep { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.in-mark .lg-echo { opacity: 0; animation: inAlpha .4s ease 1.5s forwards; }
+@keyframes inAlpha { to { opacity: .65; } }
+/* the slash: strikes diagonally fast, with a flash on impact */
+.in-mark .lg-slash { stroke-dasharray: 100; stroke-dashoffset: 100; animation: inStrike .22s cubic-bezier(.1,.9,.1,1) .5s forwards, inFlash .3s ease .74s 2; }
+@keyframes inStrike { 0% { opacity: 1; stroke-dashoffset: 100; } 100% { opacity: 1; stroke-dashoffset: 0; } }
+@keyframes inFlash { 30% { filter: drop-shadow(0 0 8px #EF4444); } }
+/* 刀 strokes draw fast, overlapping */
+.in-mark .lg-k1, .in-mark .lg-k2 { stroke-dasharray: 100; stroke-dashoffset: 100; }
+.in-mark .lg-k1 { animation: inStrike .26s cubic-bezier(.2,.9,.2,1) .72s forwards; }
+.in-mark .lg-k2 { animation: inStrike .3s cubic-bezier(.2,.9,.2,1) .9s forwards; }
+.in-mark::after { content: none; }
 @keyframes inBreathe {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,.10), 0 30px 90px -22px rgba(37,99,235,.66); }
-  50% { box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 36px 110px -20px rgba(37,99,235,.9); }
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,.10), 0 26px 80px -22px rgba(239,68,68,.5); }
+  50% { box-shadow: 0 0 0 1px rgba(255,255,255,.16), 0 34px 100px -20px rgba(239,68,68,.72); }
 }
 @keyframes inPopIn { to { opacity: 1; transform: none; } }
-@keyframes inDraw { 0% { opacity: 1; stroke-dashoffset: 100; } 100% { opacity: 1; stroke-dashoffset: 0; } }
 
-/* wordmark: letters spring in one by one with a light gradient sweep */
+/* wordmark: letters snap in fast with a blue gradient sweep */
 .in-word {
   margin: 0; margin-top: 4px; font-size: clamp(38px, 7.5vw, 82px); font-weight: 800; letter-spacing: .01em; line-height: 1.05;
   background: linear-gradient(100deg, #fff 0%, #D7E6FF 35%, #9CCBFB 58%, #EAF3FF 78%, #fff 100%);
   background-size: 220% 100%; background-clip: text; -webkit-background-clip: text; color: transparent;
-  animation: inWordShift 7s ease 3.2s infinite;
+  animation: inWordShift 6s ease 2.2s infinite;
 }
 @keyframes inWordShift { 50% { background-position: 100% 0; } }
 .in-word span {
   display: inline-block;
-  opacity: 0; transform: translateY(.6em) rotate(4deg) scale(.85); filter: blur(9px);
-  animation: inLetter .6s cubic-bezier(.34, 1.5, .64, 1) calc(1.7s + var(--i) * .07s) forwards;
+  opacity: 0; transform: translateY(.55em) rotate(6deg) scale(.7); filter: blur(8px);
+  animation: inLetter .38s cubic-bezier(.34,1.5,.64,1) calc(1.25s + var(--i) * .06s) forwards;
 }
 @keyframes inLetter { 60% { filter: blur(0); } to { opacity: 1; transform: none; filter: blur(0); } }
 
 .in-line {
   width: 240px; height: 1px; margin-top: 2px;
   background: linear-gradient(90deg, transparent, rgba(124,92,255,.95) 30%, rgba(20,217,196,.95) 70%, transparent);
-  transform: scaleX(0); opacity: 0; animation: inLine .9s var(--ease) 2.35s forwards;
+  transform: scaleX(0); opacity: 0; animation: inLine .8s var(--ease) 1.62s forwards;
 }
 @keyframes inLine { to { opacity: 1; transform: scaleX(1); } }
 
 .in-sub {
   margin: 0; font-size: clamp(10px, 1.5vw, 12.5px); font-weight: 600;
   letter-spacing: .5em; text-transform: uppercase; color: rgba(236,235,245,.6);
-  opacity: 0; animation: inRise .7s var(--ease) 2.6s forwards;
+  opacity: 0; animation: inRise .55s var(--ease) 1.85s forwards;
 }
 @keyframes inRise { to { opacity: 1; } }
 
@@ -188,9 +200,9 @@ body::before {
   opacity: 0; transform: translateY(10px) scale(.94);
   animation: inChip .45s var(--spring) forwards;
 }
-.in-chip.c1 { animation-delay: 3s; box-shadow: inset 0 0 0 0, 0 0 0 0, 0 10px 24px -14px rgba(20,217,196,.5); }
-.in-chip.c2 { animation-delay: 3.12s; box-shadow: 0 10px 24px -14px rgba(124,92,255,.5); }
-.in-chip.c3 { animation-delay: 3.24s; box-shadow: 0 10px 24px -14px rgba(59,130,246,.5); }
+.in-chip.c1 { animation-delay: 2.05s; box-shadow: inset 0 0 0 0, 0 0 0 0, 0 10px 24px -14px rgba(20,217,196,.5); }
+.in-chip.c2 { animation-delay: 2.17s; box-shadow: 0 10px 24px -14px rgba(124,92,255,.5); }
+.in-chip.c3 { animation-delay: 2.29s; box-shadow: 0 10px 24px -14px rgba(59,130,246,.5); }
 .in-chip.c1 svg { color: var(--turq); } .in-chip.c2 svg { color: var(--purple); } .in-chip.c3 svg { color: var(--info); }
 @keyframes inChip { to { opacity: 1; transform: none; } }
 
@@ -203,7 +215,7 @@ body::before {
   position: absolute; inset: 0 auto 0 0; width: 100%; transform-origin: left;
   background: linear-gradient(90deg, var(--purple), var(--turq));
   transform: scaleX(0); animation: inBar linear forwards;
-  animation-duration: 4.3s; animation-delay: .2s;
+  animation-duration: 2.6s; animation-delay: .1s;
 }
 #intro.fast .in-progress i { transform: scaleX(1); }
 @keyframes inBar { to { transform: scaleX(1); } }
@@ -214,13 +226,13 @@ body::before {
   background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.14);
   color: rgba(236,235,245,.85); padding: 9px 15px; border-radius: 999px;
   font-size: 12px; font-weight: 600; letter-spacing: .04em;
-  opacity: 0; animation: inRise .7s ease 1.6s forwards;
+  opacity: 0; animation: inRise .5s ease .9s forwards;
   transition: background .2s, color .2s, transform .2s;
 }
 .in-skip:hover { background: rgba(255,255,255,.12); color: #fff; transform: translateY(-1px); }
 .in-hint {
   inset-inline-start: 30px; margin: 0; font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase;
-  color: rgba(236,235,245,.35); opacity: 0; animation: inRise 1s ease 3.4s forwards;
+  color: rgba(236,235,245,.35); opacity: 0; animation: inRise .6s ease 2.2s forwards;
 }
 @media (max-width: 640px) { .in-hint { display: none; } }
 
@@ -239,9 +251,9 @@ body::before {
   animation: rise .7s var(--ease) both;
 }
 .login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
-.login-brand .mark { width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center; background: #fff; overflow: hidden; box-shadow: 0 12px 30px -14px rgba(37,99,235,.7); }
-.login-brand .mark svg { width: 24px; height: 24px; color: #fff; }
-.login-brand .mark img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.login-brand .mark { width: 54px; height: 54px; display: grid; place-items: center; background: transparent; overflow: visible; }
+.login-brand .mark svg { width: 54px; height: 54px; display: block; filter: drop-shadow(0 14px 34px -12px rgba(239,68,68,.55)); }
+
 .login-brand h1 { font-size: 19px; margin: 0; letter-spacing: -.02em; }
 .login-brand p { margin: 2px 0 0; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--text-3); }
 .login-card h2 { font-size: 22px; margin: 0 0 6px; letter-spacing: -.02em; }
@@ -289,11 +301,11 @@ body::before {
   transition: transform .35s var(--ease);
 }
 .brand { display: flex; align-items: center; gap: 11px; padding: 4px 8px 16px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
-.brand .mark { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: #fff; flex: none; overflow: hidden; box-shadow: 0 10px 26px -12px rgba(37,99,235,.55); }
-.brand .mark svg { width: 21px; height: 21px; color: #fff; }
-.brand .mark img { width: 100%; height: 100%; display: block; object-fit: contain; }
-.brand .mark img { transition: transform .35s var(--spring); }
-.brand:hover .mark img { transform: scale(1.09) rotate(-2deg); }
+.brand .mark { width: 42px; height: 42px; display: grid; place-items: center; background: transparent; flex: none; overflow: visible; }
+.brand .mark svg { width: 42px; height: 42px; display: block; filter: drop-shadow(0 10px 26px -10px rgba(239,68,68,.5)); transition: transform .35s var(--spring); }
+
+
+.brand:hover .mark svg { transform: scale(1.08) rotate(-3deg); }
 .brand b { display: block; font-size: 14.5px; letter-spacing: -.01em; }
 .brand small { display: block; font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-3); margin-top: 2px; }
 

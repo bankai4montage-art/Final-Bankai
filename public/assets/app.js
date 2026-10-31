@@ -60,7 +60,7 @@ function toast(message, kind = 'ok') {
 const intro = (() => {
   const el = $('#intro');
   const word = $('#inWord');
-  const BAR_MS = matchMedia('(prefers-reduced-motion: reduce)').matches ? 400 : 4300;
+  const BAR_MS = matchMedia('(prefers-reduced-motion: reduce)').matches ? 400 : 2650;
   let finishTimer = 0, finished = false;
 
   /* build the wordmark once: one span per letter for the stagger effect */
@@ -81,8 +81,8 @@ const intro = (() => {
     finished = true;
     clearTimeout(finishTimer);
     el.classList.add('out');
-    // done() fires once the zoom-out fully clears the screen
-    setTimeout(() => { el.classList.remove('out'); el.style.display = 'none'; el._done?.(); el._done = null; }, 750);
+    // done() fires once the katana cut fully clears the screen
+    setTimeout(() => { el.classList.remove('out'); el.style.display = 'none'; el._done?.(); el._done = null; }, 640);
   }
 
   function play({ force = false, done = () => {} } = {}) {

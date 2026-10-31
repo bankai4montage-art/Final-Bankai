@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#07070B" />
 <title>Rawahel · Command Center</title>
 <meta name="description" content="Rawahel — one platform, three systems, one identity. Powered by Bankai." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%237C5CFF'/%3E%3Cpath d='M9 9h6l3 6m-6 6a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Zm13 0a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Zm-1-5h-3a5 5 0 0 1-5-5m6 0h2l3 6.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 56'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230F1E45'/%3E%3Cstop offset='1' stop-color='%2316234A'/%3E%3C/linearGradient%3E%3CclipPath id='c'%3E%3Crect x='4' y='4' width='48' height='48' rx='14'/%3E%3C/clipPath%3E%3C/defs%3E%3Crect x='4' y='4' width='48' height='48' rx='14' fill='url(%23g)'/%3E%3Cg clip-path='url(%23c)'%3E%3Cpath d='M10 50 L46 6' stroke='%23EF4444' stroke-width='5'/%3E%3Cpath d='M15 24 h24' stroke='%23fff' stroke-width='4.4' stroke-linecap='round'/%3E%3Cpath d='M21 24 c 2 10, 9.5 15.5, 20 18.5' fill='none' stroke='%23fff' stroke-width='4.4'/%3E%3C/g%3E%3C/svg%3E" />
 <link rel="stylesheet" href="/assets/styles.css" />
 </head>
 <body>
@@ -54,12 +54,17 @@
       <svg viewBox="0 0 56 56" aria-hidden="true">
         <defs>
           <linearGradient id="rawahel-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#2563eb" /><stop offset="100%" stop-color="#60a5fa" />
+            <stop offset="0%" stop-color="#0F1E45" /><stop offset="100%" stop-color="#16234A" />
           </linearGradient>
+          <clipPath id="rawahel-clip"><rect x="4" y="4" width="48" height="48" rx="14" /></clipPath>
         </defs>
         <rect class="lg-tile" x="4" y="4" width="48" height="48" rx="14" fill="url(#rawahel-grad)" />
-        <path class="lg-peak" d="M18 40 L28 16 L38 40" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" pathLength="100" />
-        <circle class="lg-dot" cx="28" cy="22" r="3" fill="#fff" />
+        <g clip-path="url(#rawahel-clip)">
+          <path class="lg-echo" d="M13 44 C 22 38, 30 30, 35 19 C 37 14, 37 10, 35 6" stroke="#60A5FA" stroke-width="1.6" opacity="0" />
+          <path class="lg-slash" d="M10 50 L46 6" stroke="#EF4444" stroke-width="5" pathLength="100" />
+        </g>
+        <path class="lg-k1" d="M15 24 h24" stroke="#fff" stroke-width="4.4" stroke-linecap="round" pathLength="100" />
+        <path class="lg-k2" d="M21 24 c 2 10, 9.5 15.5, 20 18.5" stroke="#fff" stroke-width="4.4" pathLength="100" />
       </svg>
     </div>
     <h1 class="in-word" id="inWord" aria-label="Rawahel"></h1>
@@ -76,13 +81,14 @@
   <div class="in-progress"><i id="inBar"></i></div>
   <button class="in-skip" id="introSkip" type="button">Skip <svg width="11" height="11" aria-hidden="true"><use href="#i-arrow"/></svg></button>
   <p class="in-hint">Press any key to continue</p>
+  <i class="in-cut" aria-hidden="true"></i>
 </div>
 
 <!-- ============================== LOGIN ============================== -->
 <section id="login" class="hidden">
   <form class="login-card" id="loginForm" autocomplete="on">
     <div class="login-brand">
-      <div class="mark"><img src="/assets/rawahel-logo.svg" alt="Rawahel" draggable="false" /></div>
+      <div class="mark"><svg viewBox="0 0 56 56" fill="none" aria-hidden="true"><defs><linearGradient id="bkGrad-brand1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0F1E45"/><stop offset="1" stop-color="#16234A"/></linearGradient><clipPath id="bkClip-brand1"><rect x="4" y="4" width="48" height="48" rx="14"/></clipPath></defs><rect x="4" y="4" width="48" height="48" rx="14" fill="url(#bkGrad-brand1)"/><g clip-path="url(#bkClip-brand1)"><path d="M13 44 C 22 38, 30 30, 35 19 C 37 14, 37 10, 35 6" stroke="#60A5FA" stroke-width="1.6" opacity=".65"/><path d="M10 50 L46 6" stroke="#EF4444" stroke-width="5"/><path d="M15 24 h24" stroke="#fff" stroke-width="4.4" stroke-linecap="round"/><path d="M21 24 c 2 10, 9.5 15.5, 20 18.5" stroke="#fff" stroke-width="4.4"/></g></svg></div>
       <div><h1>Rawahel</h1><p>Powered by Bankai</p></div>
     </div>
     <h2>Sign in</h2>
@@ -107,7 +113,7 @@
 
   <aside class="sidebar" id="sidebar">
     <div class="brand">
-      <div class="mark"><img src="/assets/rawahel-logo.svg" alt="Rawahel" draggable="false" /></div>
+      <div class="mark"><svg viewBox="0 0 56 56" fill="none" aria-hidden="true"><defs><linearGradient id="bkGrad-brand2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0F1E45"/><stop offset="1" stop-color="#16234A"/></linearGradient><clipPath id="bkClip-brand2"><rect x="4" y="4" width="48" height="48" rx="14"/></clipPath></defs><rect x="4" y="4" width="48" height="48" rx="14" fill="url(#bkGrad-brand2)"/><g clip-path="url(#bkClip-brand2)"><path d="M13 44 C 22 38, 30 30, 35 19 C 37 14, 37 10, 35 6" stroke="#60A5FA" stroke-width="1.6" opacity=".65"/><path d="M10 50 L46 6" stroke="#EF4444" stroke-width="5"/><path d="M15 24 h24" stroke="#fff" stroke-width="4.4" stroke-linecap="round"/><path d="M21 24 c 2 10, 9.5 15.5, 20 18.5" stroke="#fff" stroke-width="4.4"/></g></svg></div>
       <div><b>Rawahel</b><small>Powered by Bankai</small></div>
     </div>
     <div class="nav-label">Workspace</div>
